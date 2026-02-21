@@ -8,15 +8,27 @@ fn take_input(input: &mut String) {
     io::stdin().read_line(input).unwrap();
 }
 
+fn command_echo(args: &[&str]) {
+    println!("{}", args.join(" "));
+}
+
 fn main() {
     let mut input = String::new();
     loop {
         take_input(&mut input);
+        let parsed_input: Vec<&str> = input.split_whitespace().collect();
+        let command = parsed_input.first().unwrap_or(&"");
         
-        if input.trim() == "exit" {
-            break;
+        if command.is_empty() {
+            continue;
         }
-        
-        println!("{}: command not found", input.trim());
+
+        let args = &parsed_input[1..];
+
+        match *command {
+            "echo" => command_echo(args),
+            "exit" => break,
+            _ => println!("{}: command not found", input.trim()),
+        }
     }
 }
