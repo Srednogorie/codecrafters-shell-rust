@@ -1,7 +1,32 @@
-#[allow(unused_imports)]
-use std::io::{self, Write};
-use std::os::unix::fs::PermissionsExt;
+mod commands;
+mod utils;
 
+use std::io::{self, Write};
+use commands::{command_echo, command_exit, command_type};
+use utils::check_unknown_command;
+
+enum Commands {
+    Echo(Vec<String>),
+    Type(Vec<String>),
+    Exit,
+}
+impl Commands {
+    fn from_str(command: &str, args: &[String]) -> Option<Commands> {
+        match command {
+            "echo" => Some(Commands::Echo(args.to_vec())),
+            "type" => Some(Commands::Type(args.to_vec())),
+            "exit" => Some(Commands::Exit),
+            _ => None,
+        }
+    }
+    fn execute(&self) {
+        match self {
+            Commands::Echo(args) => command_echo(args),
+            Commands::Type(args) => command_type(args),
+            Commands::Exit => command_exit(),
+        }
+    }
+}
 
 fn take_input(input: &mut String) {
     input.clear();
@@ -10,62 +35,23 @@ fn take_input(input: &mut String) {
     io::stdin().read_line(input).unwrap();
 }
 
-fn command_echo(args: &[&str]) {
-    println!("{}", args.join(" "));
-}
-
-fn check_unknown_command(command: &str) {
-    let key = "PATH";
-    let mut found = false;
-    match std::env::var_os(key) {
-        Some(paths) => {
-            for path in std::env::split_paths(&paths) {
-                let path = format!("{}/{}", path.to_str().unwrap(), command);
-                if std::fs::metadata(&path).is_ok() {
-                    // Check if the file is executable
-                    if std::fs::metadata(&path).unwrap().permissions().mode() & 0o111 != 0 {
-                        found = true;
-                        println!("{} is {}", command, &path);
-                        break;
-                    }
-                }
-            }
-        }
-        None => {}
-    }
-    if !found {
-        println!("{}: not found", command);
-    }
-}
-
-fn command_type(args: &[&str]) {
-    let command = args.first().unwrap_or(&"");
-    match *command {
-        "echo" => println!("echo is a shell builtin"),
-        "type" => println!("type is a shell builtin"),
-        "exit" => println!("exit is a shell builtin"),
-        _ => check_unknown_command(command),
-    }
-}
-
 fn main() {
     let mut input = String::new();
     loop {
         take_input(&mut input);
-        let parsed_input: Vec<&str> = input.split_whitespace().collect();
-        let command = parsed_input.first().unwrap_or(&"");
+        let mut iter = input.split_whitespace();
         
-        if command.is_empty() {
-            continue;
-        }
+        let command = match iter.next() {
+            Some(cmd) => cmd,
+            None => continue,  // empty input, no need for the is_empty check
+        };
 
-        let args = &parsed_input[1..];
+        let args: Vec<String> = iter.map(|s| s.to_string()).collect();
 
-        match *command {
-            "echo" => command_echo(args),
-            "type" => command_type(args),
-            "exit" => break,
-            _ => println!("{}: command not found", input.trim()),
+        match Commands::from_str(command, &args) {
+            Some(cmd) => cmd.execute(),
+            // None => println!("{}: command not found", input.trim()),
+            None => check_unknown_command(command, args, true),
         }
     }
 }
