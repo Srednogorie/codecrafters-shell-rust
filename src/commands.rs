@@ -14,7 +14,12 @@ pub fn command_type(args: &[String]) {
         "echo" => println!("echo is a shell builtin"),
         "type" => println!("type is a shell builtin"),
         "exit" => println!("exit is a shell builtin"),
+        "pwd" => println!("pwd is a shell builtin"),
         // We are calling from type meaning we don't wan to execute so we don't need to pass args either
         _ => check_unknown_command(command, vec![], false),
     }
+}
+
+pub fn command_pwd() {
+    println!("{}", std::env::current_dir().unwrap().display());
 }

@@ -2,13 +2,14 @@ mod commands;
 mod utils;
 
 use std::io::{self, Write};
-use commands::{command_echo, command_exit, command_type};
+use commands::{command_echo, command_exit, command_type, command_pwd};
 use utils::check_unknown_command;
 
 enum Commands {
     Echo(Vec<String>),
     Type(Vec<String>),
     Exit,
+    Pwd,
 }
 impl Commands {
     fn from_str(command: &str, args: &[String]) -> Option<Commands> {
@@ -16,6 +17,7 @@ impl Commands {
             "echo" => Some(Commands::Echo(args.to_vec())),
             "type" => Some(Commands::Type(args.to_vec())),
             "exit" => Some(Commands::Exit),
+            "pwd" => Some(Commands::Pwd),
             _ => None,
         }
     }
@@ -23,6 +25,7 @@ impl Commands {
         match self {
             Commands::Echo(args) => command_echo(args),
             Commands::Type(args) => command_type(args),
+            Commands::Pwd => command_pwd(),
             Commands::Exit => command_exit(),
         }
     }
