@@ -1,4 +1,4 @@
-use crate::utils::*;
+use crate::{Commands, utils::*};
 
 pub fn command_echo(args: &[String]) {
     println!("{}", args.join(" "));
@@ -10,13 +10,10 @@ pub fn command_exit() {
 
 pub fn command_type(args: &[String]) {
     let command = args.first().map(|s| s.as_str()).unwrap_or("");
-    match command {
-        "echo" => println!("echo is a shell builtin"),
-        "type" => println!("type is a shell builtin"),
-        "exit" => println!("exit is a shell builtin"),
-        "pwd" => println!("pwd is a shell builtin"),
-        // We are calling from type meaning we don't wan to execute so we don't need to pass args either
-        _ => check_unknown_command(command, vec![], false),
+    let command_enum = Commands::from_str(command, args);
+    match command_enum {
+        Some(cmd) => println!("{} is a shell builtin", cmd),
+        None => check_unknown_command(command, vec![], false),
     }
 }
 

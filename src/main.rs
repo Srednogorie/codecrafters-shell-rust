@@ -2,6 +2,8 @@ mod commands;
 mod utils;
 
 use std::io::{self, Write};
+use std::fmt;
+
 use commands::{command_echo, command_exit, command_type, command_pwd};
 use utils::check_unknown_command;
 
@@ -10,6 +12,17 @@ enum Commands {
     Type(Vec<String>),
     Exit,
     Pwd,
+}
+impl fmt::Display for Commands {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Commands::Echo(_) => "echo",
+            Commands::Type(_) => "type",
+            Commands::Exit => "exit",
+            Commands::Pwd => "pwd",
+        };
+        write!(f, "{}", name)
+    }
 }
 impl Commands {
     fn from_str(command: &str, args: &[String]) -> Option<Commands> {
