@@ -1,48 +1,11 @@
-mod commands;
 mod utils;
+mod enums;
+mod commands;
 
 use std::io::{self, Write};
-use std::fmt;
-
-use commands::{command_echo, command_exit, command_type, command_pwd};
 use utils::check_unknown_command;
+use enums::Commands;
 
-enum Commands {
-    Echo(Vec<String>),
-    Type(Vec<String>),
-    Exit,
-    Pwd,
-}
-impl fmt::Display for Commands {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            Commands::Echo(_) => "echo",
-            Commands::Type(_) => "type",
-            Commands::Exit => "exit",
-            Commands::Pwd => "pwd",
-        };
-        write!(f, "{}", name)
-    }
-}
-impl Commands {
-    fn from_str(command: &str, args: &[String]) -> Option<Commands> {
-        match command {
-            "echo" => Some(Commands::Echo(args.to_vec())),
-            "type" => Some(Commands::Type(args.to_vec())),
-            "exit" => Some(Commands::Exit),
-            "pwd" => Some(Commands::Pwd),
-            _ => None,
-        }
-    }
-    fn execute(&self) {
-        match self {
-            Commands::Echo(args) => command_echo(args),
-            Commands::Type(args) => command_type(args),
-            Commands::Pwd => command_pwd(),
-            Commands::Exit => command_exit(),
-        }
-    }
-}
 
 fn take_input(input: &mut String) {
     input.clear();

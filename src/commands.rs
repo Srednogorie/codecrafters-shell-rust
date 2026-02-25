@@ -1,4 +1,5 @@
-use crate::{Commands, utils::*};
+use crate::utils::*;
+use crate::enums::Commands;
 
 pub fn command_echo(args: &[String]) {
     println!("{}", args.join(" "));
@@ -19,4 +20,20 @@ pub fn command_type(args: &[String]) {
 
 pub fn command_pwd() {
     println!("{}", std::env::current_dir().unwrap().display());
+}
+
+pub fn command_cd(path: String) {
+    if path.starts_with("/") {
+        if std::fs::metadata(path.clone()).is_ok() {
+            std::env::set_current_dir(&path).unwrap();
+        } else {
+            eprintln!("cd: {}: No such file or directory", path);
+        }
+    } else {
+        let current_dir = std::env::current_dir().unwrap();
+        let new_dir = current_dir.join(&path);
+        if let Err(e) = std::env::set_current_dir(&new_dir) {
+            eprintln!("cd: {}: {}", path, e);
+        }
+    }
 }
