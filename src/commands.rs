@@ -23,7 +23,7 @@ pub fn command_pwd() {
     println!("{}", std::env::current_dir().unwrap().display());
 }
 
-fn command_cd_set_current_dir(std_path: &Path, path: &String) {
+fn command_cd_set_current_dir(std_path: &Path, path: &str) {
     if std::fs::metadata(std_path).is_ok() {
         std::env::set_current_dir(path).unwrap();
     } else {
@@ -37,9 +37,14 @@ pub fn command_cd(path: String) {
     if std_path.is_absolute() {
         command_cd_set_current_dir(std_path, &path);
     } else {
-        let current_dir = std::env::current_dir().unwrap();
-        let new_dir = current_dir.join(std_path);
-        let new_dir = new_dir.as_path();
-        command_cd_set_current_dir(new_dir, &path);
+        if std_path.starts_with("~") {
+            let home_dir = std::env::home_dir().unwrap();
+            command_cd_set_current_dir(home_dir.as_path(), home_dir.to_str().unwrap());
+        } else {
+            let current_dir = std::env::current_dir().unwrap();
+            let new_dir = current_dir.join(std_path);
+            let new_dir = new_dir.as_path();
+            command_cd_set_current_dir(new_dir, &path);
+        }
     }
 }
