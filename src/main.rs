@@ -55,6 +55,10 @@ fn parse_input(input: &str) -> Vec<String> {
                 }
             }
             '"' => {
+                if inside_single_quote {
+                    token.push(char);
+                    continue;
+                }
                 if inside_double_quote {
                     inside_double_quote = false;
                 } else {
@@ -62,6 +66,10 @@ fn parse_input(input: &str) -> Vec<String> {
                 }
             }
             '\\' => {
+                if inside_single_quote {
+                    token.push(char);
+                    continue;
+                }
                 escape_next = true;
             }
             _ => {
