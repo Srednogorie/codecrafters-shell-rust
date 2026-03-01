@@ -26,7 +26,13 @@ fn parse_input(input: &str) -> Vec<String> {
     let mut token = String::new();
     let mut inside_single_quote = false;
     let mut inside_double_quote = false;
+    let mut escape_next = false;
     for char in input.chars() {
+        if escape_next {
+            token.push(char);
+            escape_next = false;
+            continue;
+        }
         match char {
             ' ' => {
                 if inside_single_quote || inside_double_quote {
@@ -54,6 +60,9 @@ fn parse_input(input: &str) -> Vec<String> {
                 } else {
                     inside_double_quote = true;
                 }
+            }
+            '\\' => {
+                escape_next = true;
             }
             _ => {
                 token.push(char);
