@@ -16,6 +16,7 @@ fn take_input(input: &mut String) {
 
 fn parse_input(input: &str) -> Vec<String> {
     let input = input.replace("''", "");
+    let input = input.replace("\"\"", "");
     // read_line` includes the **newline character** `'\n'` at the end of the input
     // trim it or it's going to sneak into the command
     let input = input.trim();
@@ -24,10 +25,11 @@ fn parse_input(input: &str) -> Vec<String> {
     
     let mut token = String::new();
     let mut inside_single_quote = false;
+    let mut inside_double_quote = false;
     for char in input.chars() {
         match char {
             ' ' => {
-                if inside_single_quote {
+                if inside_single_quote || inside_double_quote {
                     token.push(char);
                 } else {
                     if !token.is_empty() {
@@ -36,10 +38,21 @@ fn parse_input(input: &str) -> Vec<String> {
                 }
             }
             '\'' => {
+                if inside_double_quote {
+                    token.push(char);
+                    continue;
+                }
                 if inside_single_quote {
                     inside_single_quote = false;
                 } else {
                     inside_single_quote = true;
+                }
+            }
+            '"' => {
+                if inside_double_quote {
+                    inside_double_quote = false;
+                } else {
+                    inside_double_quote = true;
                 }
             }
             _ => {
