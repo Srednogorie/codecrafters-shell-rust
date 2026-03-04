@@ -62,6 +62,20 @@ pub fn check_unknown_command(
                                         .status()
                                         .expect("Failed to execute command");
                                 }
+                                Some(SpecialTokens::ErrAppend) => {
+                                    std::process::Command::new(&path)
+                                        .arg0(command)
+                                        .args(args)
+                                        .stderr(
+                                            std::fs::OpenOptions::new()
+                                                .create(true)
+                                                .append(true)
+                                                .open(special_token_arg.unwrap())
+                                                .unwrap()
+                                        )
+                                        .status()
+                                        .expect("Failed to execute command");
+                                }
                                 None => {
                                     std::process::Command::new(&path)
                                         .arg0(command)
