@@ -1,25 +1,27 @@
 use std::path::Path;
 use crate::utils::*;
-use crate::enums::Commands;
+use crate::enums::{Commands};
+use std::io::Write;
 
-pub fn command_echo(args: &[String]) {
-    println!("{}", args.join(" "));
+pub fn command_echo(args: &[String], writer: &mut dyn Write) {
+    writeln!(writer, "{}", args.join(" ")).unwrap();
 }
+
 
 pub fn command_exit() {
     std::process::exit(0);
 }
 
-pub fn command_type(args: &[String]) {
+pub fn command_type(args: &[String], writer: &mut dyn Write) {
     let command = args.first().map(|s| s.as_str()).unwrap_or("");
     let command_enum = Commands::from_str(command, args);
     match command_enum {
         Some(cmd) => println!("{} is a shell builtin", cmd),
-        None => check_unknown_command(command, vec![], false),
+        None => check_unknown_command(command, vec![], false, None, None),
     }
 }
 
-pub fn command_pwd() {
+pub fn command_pwd(writer: &mut dyn Write) {
     println!("{}", std::env::current_dir().unwrap().display());
 }
 
@@ -31,7 +33,7 @@ fn command_cd_set_current_dir(std_path: &Path, path: &str) {
     }
 }
 
-pub fn command_cd(path: String) {
+pub fn command_cd(path: String, writer: &mut dyn Write) {
     // On Unix, a path is absolute if it starts with the root, so is_absolute and has_root are equivalent.
     let std_path = Path::new(&path);
     if std_path.is_absolute() {

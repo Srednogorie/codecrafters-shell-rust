@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::fmt;
 use crate::commands::{command_echo, command_exit, command_type, command_pwd, command_cd};
 
@@ -32,13 +33,45 @@ impl Commands {
             _ => None,
         }
     }
-    pub fn execute(&self) {
+    pub fn execute(&self, writer: &mut dyn Write) {
         match self {
-            Commands::Echo(args) => command_echo(args),
-            Commands::Type(args) => command_type(args),
-            Commands::Pwd => command_pwd(),
+            Commands::Echo(args) => command_echo(args, writer),
+            Commands::Type(args) => command_type(args, writer),
+            Commands::Pwd => command_pwd(writer),
             Commands::Exit => command_exit(),
-            Commands::Cd(path) => command_cd(path.to_string()),
+            Commands::Cd(path) => command_cd(path.to_string(), writer),
+        }
+    }
+}
+
+pub enum SpecialTokens {
+    StdOut,
+    StdOutExtended,
+    // StdErr,
+    // StdInOut,
+    // StdAppend,
+}
+impl fmt::Display for SpecialTokens {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            SpecialTokens::StdOut => ">",
+            SpecialTokens::StdOutExtended => "1>",
+            // SpecialTokens::StdErr => "2>",
+            // SpecialTokens::StdInOut => "&>",
+            // SpecialTokens::StdAppend => ">>",
+        };
+        write!(f, "{}", name)
+    }
+}
+impl SpecialTokens {
+    pub fn from_str(command: &str) -> Option<SpecialTokens> {
+        match command {
+            ">" => Some(SpecialTokens::StdOut),
+            "1>" => Some(SpecialTokens::StdOutExtended),
+            // "2>" => Some(SpecialTokens::StdErr),
+            // "&>" => Some(SpecialTokens::StdInOut),
+            // ">>" => Some(SpecialTokens::StdAppend),
+            _ => None,
         }
     }
 }

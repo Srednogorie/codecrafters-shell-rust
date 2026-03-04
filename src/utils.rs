@@ -1,6 +1,13 @@
-use std::os::unix::{fs::PermissionsExt, process::CommandExt};
+use std::{os::unix::{fs::PermissionsExt, process::CommandExt}, process::Stdio};
+use crate::SpecialTokens;
 
-pub fn check_unknown_command(command: &str, args: Vec<String>, execute: bool) {
+pub fn check_unknown_command(
+    command: &str,
+    args: Vec<String>,
+    execute: bool,
+    special_token: Option<SpecialTokens>,
+    special_token_arg: Option<&str>
+) {
     let key = "PATH";
     let mut found = false;
     match std::env::var_os(key) {
@@ -12,11 +19,29 @@ pub fn check_unknown_command(command: &str, args: Vec<String>, execute: bool) {
                     if std::fs::metadata(&path).unwrap().permissions().mode() & 0o111 != 0 {
                         found = true;
                         if execute {
-                            std::process::Command::new(&path)
-                            .arg0(command)
-                            .args(args)
-                            .status()  // TODO - start form here spawn versus status
-                            .expect("Failed to execute command");
+                            match special_token {
+                                Some(SpecialTokens::StdOut | SpecialTokens::StdOutExtended) => {
+                                    std::process::Command::new(&path)
+                                        .arg0(command)
+                                        .args(args)
+                                        .stdout(
+                                            Stdio::from(
+                                                std::fs::File::create(
+                                                    &special_token_arg.unwrap()
+                                                ).expect("Failed to create file")
+                                            )
+                                        )
+                                        .status()
+                                        .expect("Failed to execute command");
+                                }
+                                None => {
+                                    std::process::Command::new(&path)
+                                        .arg0(command)
+                                        .args(args)
+                                        .status()
+                                        .expect("Failed to execute command");
+                                }
+                            }
                         } else {
                             println!("{} is {}", command, path);
                         }
