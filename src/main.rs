@@ -104,6 +104,14 @@ fn parse_tokens(iter: &[String]) -> (&String, Vec<String>, Option<SpecialTokens>
                 special_token = Some(SpecialTokens::StdErr);
                 has_special_token = true;   
             }
+            ">>" => {
+                special_token = Some(SpecialTokens::StdAppend);
+                has_special_token = true;
+            }
+            "1>>" => {
+                special_token = Some(SpecialTokens::StdAppendExtended);
+                has_special_token = true;
+            }
             _ => {
                 if has_special_token {
                     special_token_arg = Some(arg.as_str());
@@ -139,6 +147,13 @@ fn main() {
                     // 2>: redirect stderr only
                     let file = Box::new(std::fs::File::create(special_token_arg.unwrap()).unwrap());
                     (Box::new(std::io::stdout()), file)
+                }
+                Some(SpecialTokens::StdAppend | SpecialTokens::StdAppendExtended) => {
+                    // >> or 1>>: append stdout
+                    let file = Box::new(
+                        std::fs::OpenOptions::new().create(true).append(true).open(special_token_arg.unwrap()).unwrap()
+                    );
+                    (file, Box::new(std::io::stderr()))
                 }
                 None => {
                     // Normal: both go to terminal

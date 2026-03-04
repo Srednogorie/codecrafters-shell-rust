@@ -48,7 +48,8 @@ pub enum SpecialTokens {
     StdOut,
     StdOutExtended,
     StdErr,
-    // StdAppend,
+    StdAppend,
+    StdAppendExtended,
 }
 impl fmt::Display for SpecialTokens {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,7 +57,8 @@ impl fmt::Display for SpecialTokens {
             SpecialTokens::StdOut => ">",
             SpecialTokens::StdOutExtended => "1>",
             SpecialTokens::StdErr => "2>",
-            // SpecialTokens::StdAppend => ">>",
+            SpecialTokens::StdAppend => ">>",
+            Self::StdAppendExtended => "1>>",
         };
         write!(f, "{}", name)
     }
