@@ -34,6 +34,20 @@ pub fn check_unknown_command(
                                         .status()
                                         .expect("Failed to execute command");
                                 }
+                                Some(SpecialTokens::StdErr) => {
+                                    std::process::Command::new(&path)
+                                        .arg0(command)
+                                        .args(args)
+                                        .stderr(
+                                            Stdio::from(
+                                                std::fs::File::create(
+                                                    &special_token_arg.unwrap()
+                                                ).expect("Failed to create file")
+                                            )
+                                        )
+                                        .status()
+                                        .expect("Failed to execute command");
+                                }
                                 None => {
                                     std::process::Command::new(&path)
                                         .arg0(command)

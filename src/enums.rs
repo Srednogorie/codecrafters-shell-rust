@@ -33,13 +33,13 @@ impl Commands {
             _ => None,
         }
     }
-    pub fn execute(&self, writer: &mut dyn Write) {
+    pub fn execute(&self, stdout_writer: &mut dyn Write, stderr_writer: &mut dyn Write) {
         match self {
-            Commands::Echo(args) => command_echo(args, writer),
-            Commands::Type(args) => command_type(args, writer),
-            Commands::Pwd => command_pwd(writer),
+            Commands::Echo(args) => command_echo(args, stdout_writer),
+            Commands::Type(args) => command_type(args, stdout_writer),
+            Commands::Pwd => command_pwd(stdout_writer),
             Commands::Exit => command_exit(),
-            Commands::Cd(path) => command_cd(path.to_string(), writer),
+            Commands::Cd(path) => command_cd(path.to_string(), stderr_writer),
         }
     }
 }
@@ -47,8 +47,7 @@ impl Commands {
 pub enum SpecialTokens {
     StdOut,
     StdOutExtended,
-    // StdErr,
-    // StdInOut,
+    StdErr,
     // StdAppend,
 }
 impl fmt::Display for SpecialTokens {
@@ -56,22 +55,9 @@ impl fmt::Display for SpecialTokens {
         let name = match self {
             SpecialTokens::StdOut => ">",
             SpecialTokens::StdOutExtended => "1>",
-            // SpecialTokens::StdErr => "2>",
-            // SpecialTokens::StdInOut => "&>",
+            SpecialTokens::StdErr => "2>",
             // SpecialTokens::StdAppend => ">>",
         };
         write!(f, "{}", name)
-    }
-}
-impl SpecialTokens {
-    pub fn from_str(command: &str) -> Option<SpecialTokens> {
-        match command {
-            ">" => Some(SpecialTokens::StdOut),
-            "1>" => Some(SpecialTokens::StdOutExtended),
-            // "2>" => Some(SpecialTokens::StdErr),
-            // "&>" => Some(SpecialTokens::StdInOut),
-            // ">>" => Some(SpecialTokens::StdAppend),
-            _ => None,
-        }
     }
 }

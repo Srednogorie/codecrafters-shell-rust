@@ -100,6 +100,10 @@ fn parse_tokens(iter: &[String]) -> (&String, Vec<String>, Option<SpecialTokens>
                 special_token = Some(SpecialTokens::StdOutExtended);
                 has_special_token = true;   
             }
+            "2>" => {
+                special_token = Some(SpecialTokens::StdErr);
+                has_special_token = true;   
+            }
             _ => {
                 if has_special_token {
                     special_token_arg = Some(arg.as_str());
@@ -123,20 +127,27 @@ fn main() {
         }
         
         let (command, command_args, special_token, special_token_arg) = parse_tokens(&iter);
-        // After parsing...
-        let mut output: Box<dyn Write> = if special_token.is_some() {
-            // Redirect to file
-            Box::new(
-                std::fs::File::create(special_token_arg.as_ref().unwrap())
-                    .expect("Failed to create file")
-            )
-        } else {
-            // Normal stdout
-            Box::new(std::io::stdout())
-        };
+
+        let (mut stdout_writer, mut stderr_writer): (Box<dyn Write>, Box<dyn Write>) = 
+            match special_token {
+                Some(SpecialTokens::StdOut | SpecialTokens::StdOutExtended) => {
+                    // > or 1>: redirect stdout only
+                    let file = Box::new(std::fs::File::create(special_token_arg.unwrap()).unwrap());
+                    (file, Box::new(std::io::stderr()))
+                }
+                Some(SpecialTokens::StdErr) => {
+                    // 2>: redirect stderr only
+                    let file = Box::new(std::fs::File::create(special_token_arg.unwrap()).unwrap());
+                    (Box::new(std::io::stdout()), file)
+                }
+                None => {
+                    // Normal: both go to terminal
+                    (Box::new(std::io::stdout()), Box::new(std::io::stderr()))
+                }
+            };
         
         match Commands::from_str(command, command_args.as_slice()) {
-            Some(cmd) => cmd.execute(&mut *output),
+            Some(cmd) => cmd.execute(&mut *stdout_writer, &mut *stderr_writer),
             None => {
                 match Some(special_token) {
                     Some(special_token) => check_unknown_command(
