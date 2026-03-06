@@ -37,11 +37,12 @@ impl Completer for ShellCompleter {
             }
         }
 
-        let candidates: Vec<String> = builtins
+        let mut candidates: Vec<String> = builtins
             .iter()
             .filter(|cmd| cmd.starts_with(prefix))
             .map(|s| format!("{} ", s))
             .collect();
+        candidates.sort();
 
         Ok((start, candidates))
     }

@@ -9,7 +9,8 @@ use enums::{Commands, SpecialTokens};
 use std::io::{self, Write};
 use structs::{ParseCommandTokens, RedirectInfo};
 use utils::check_unknown_command;
-use rustyline::{Editor, Result};
+use rustyline::{Editor, Result, CompletionType};
+use rustyline::config::Config;
 
 use crate::custom_rustyline::ShellCompleter;
 
@@ -129,7 +130,10 @@ fn parse_tokens(iter: &[String]) -> ParseCommandTokens<'_> {
 }
 
 fn main() -> Result<()> {
-    let mut rl = Editor::new()?;
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .build();
+    let mut rl = Editor::with_config(config)?;
     rl.set_helper(Some(ShellCompleter));
 
     loop {
