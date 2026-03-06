@@ -13,14 +13,6 @@ use rustyline::{Editor, Result};
 
 use crate::custom_rustyline::ShellCompleter;
 
-fn take_input(input: &mut String) -> std::io::Result<()> {
-    input.clear();
-    print!("$ ");
-    io::stdout().flush()?;
-    io::stdin().read_line(input)?;
-    Ok(())
-}
-
 fn parse_input(input: &str) -> Vec<String> {
     let input = input.replace("''", "");
     let input = input.replace("\"\"", "");

@@ -1,15 +1,17 @@
 use crate::{enums::ShellError, structs::RedirectInfo};
 use std::{
-    os::unix::{fs::PermissionsExt, process::CommandExt},
-    path::PathBuf,
-    process::Stdio,
+    ffi::OsString, os::unix::{fs::PermissionsExt, process::CommandExt}, path::PathBuf, process::Stdio
 };
 
 const PERMISSIONS_EXECUTABLE: u32 = 0o111;
 const PATH_KEY: &str = "PATH";
 
+pub fn get_paths() -> Option<OsString> {
+    std::env::var_os(PATH_KEY)
+}
+
 fn find_command_in_path(command: &str) -> Option<PathBuf> {
-    let paths = std::env::var_os(PATH_KEY)?;
+    let paths = get_paths()?;
 
     for path in std::env::split_paths(&paths) {
         let full = path.join(command);
