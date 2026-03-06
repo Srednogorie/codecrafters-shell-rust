@@ -1,17 +1,24 @@
-mod utils;
-mod enums;
 mod commands;
+mod enums;
+mod structs;
+mod utils;
+mod custom_rustyline;
 
-use std::io::{self, Write};
-use utils::{check_unknown_command};
+
 use enums::{Commands, SpecialTokens};
+use std::io::{self, Write};
+use structs::{ParseCommandTokens, RedirectInfo};
+use utils::check_unknown_command;
+use rustyline::{Editor, Result};
 
+use crate::custom_rustyline::ShellCompleter;
 
-fn take_input(input: &mut String) {
+fn take_input(input: &mut String) -> std::io::Result<()> {
     input.clear();
     print!("$ ");
-    io::stdout().flush().unwrap();
-    io::stdin().read_line(input).unwrap();
+    io::stdout().flush()?;
+    io::stdin().read_line(input)?;
+    Ok(())
 }
 
 fn parse_input(input: &str) -> Vec<String> {
@@ -20,9 +27,9 @@ fn parse_input(input: &str) -> Vec<String> {
     // read_line` includes the **newline character** `'\n'` at the end of the input
     // trim it or it's going to sneak into the command
     let input = input.trim();
-    
+
     let mut tokens = Vec::new();
-    
+
     let mut token = String::new();
     let mut inside_single_quote = false;
     let mut inside_double_quote = false;
@@ -77,14 +84,14 @@ fn parse_input(input: &str) -> Vec<String> {
             }
         }
     }
-    
+
     if !token.is_empty() {
         tokens.push(std::mem::take(&mut token));
     }
     tokens
 }
 
-fn parse_tokens(iter: &[String]) -> (&String, Vec<String>, Option<SpecialTokens>, Option<&str>) {
+fn parse_tokens(iter: &[String]) -> ParseCommandTokens<'_> {
     let (command, command_args_raw) = iter.split_first().unwrap();
     let mut special_token = None;
     let mut special_token_arg = None;
@@ -94,15 +101,15 @@ fn parse_tokens(iter: &[String]) -> (&String, Vec<String>, Option<SpecialTokens>
         match arg.as_str() {
             ">" => {
                 special_token = Some(SpecialTokens::StdOut);
-                has_special_token = true;   
+                has_special_token = true;
             }
             "1>" => {
                 special_token = Some(SpecialTokens::StdOutExtended);
-                has_special_token = true;   
+                has_special_token = true;
             }
             "2>" => {
                 special_token = Some(SpecialTokens::StdErr);
-                has_special_token = true;   
+                has_special_token = true;
             }
             ">>" => {
                 special_token = Some(SpecialTokens::StdAppend);
@@ -125,63 +132,57 @@ fn parse_tokens(iter: &[String]) -> (&String, Vec<String>, Option<SpecialTokens>
             }
         }
     }
-    
-    return (command, command_args, special_token, special_token_arg)
+
+    return ParseCommandTokens { command, command_args, special_token, special_token_arg };
 }
 
-fn main() {
-    let mut input = String::new();
+fn main() -> Result<()> {
+    let mut rl = Editor::new()?;
+    rl.set_helper(Some(ShellCompleter));
+
     loop {
-        take_input(&mut input);
+        let input = rl.readline("$ ")?;
+
         let iter = parse_input(&input);
         if iter.is_empty() {
             continue;
         }
-        
-        let (command, command_args, special_token, special_token_arg) = parse_tokens(&iter);
 
-        let (mut stdout_writer, mut stderr_writer): (Box<dyn Write>, Box<dyn Write>) = 
-            match special_token {
-                Some(SpecialTokens::StdOut | SpecialTokens::StdOutExtended) => {
-                    // > or 1>: redirect stdout only
-                    let file = Box::new(std::fs::File::create(special_token_arg.unwrap()).unwrap());
-                    (file, Box::new(std::io::stderr()))
-                }
-                Some(SpecialTokens::StdErr) => {
-                    // 2>: redirect stderr only
-                    let file = Box::new(std::fs::File::create(special_token_arg.unwrap()).unwrap());
-                    (Box::new(std::io::stdout()), file)
-                }
-                Some(SpecialTokens::StdAppend | SpecialTokens::StdAppendExtended) => {
-                    // >> or 1>>: append stdout
-                    let file = Box::new(
-                        std::fs::OpenOptions::new().create(true).append(true).open(special_token_arg.unwrap()).unwrap()
-                    );
-                    (file, Box::new(std::io::stderr()))
-                }
-                Some(SpecialTokens::ErrAppend) => {
-                    // 2>>: append stderr
-                    let file = Box::new(
-                        std::fs::OpenOptions::new().create(true).append(true).open(special_token_arg.unwrap()).unwrap()
-                    );
-                    (Box::new(std::io::stdout()), file)
-                }
-                None => {
-                    // Normal: both go to terminal
-                    (Box::new(std::io::stdout()), Box::new(std::io::stderr()))
-                }
-            };
-        
-        match Commands::from_str(command, command_args.as_slice()) {
-            Some(cmd) => cmd.execute(&mut *stdout_writer, &mut *stderr_writer),
-            None => {
-                match Some(special_token) {
-                    Some(special_token) => check_unknown_command(
-                        command, command_args, true, special_token, special_token_arg
-                    ),
-                    None => check_unknown_command(command, command_args.to_vec(), true, None, None),
+        let parsed_command_tokens = parse_tokens(&iter);
+
+        let (mut stdout_writer, mut stderr_writer): (Box<dyn Write>, Box<dyn Write>) = match &parsed_command_tokens
+            .special_token
+        {
+            Some(token) => {
+                let file = Box::new(token.open_file(parsed_command_tokens.special_token_arg.unwrap())?);
+                if token.is_stdout_redirect() { (file, Box::new(io::stderr())) } else { (Box::new(io::stdout()), file) }
+            }
+            None => (Box::new(io::stdout()), Box::new(io::stderr())),
+        };
+
+        match Commands::from_str(parsed_command_tokens.command.as_str(), parsed_command_tokens.command_args.as_slice())
+        {
+            Ok(Some(cmd)) => {
+                if let Err(e) = cmd.execute(&mut *stdout_writer, &mut *stderr_writer) {
+                    eprintln!("{}", e);
                 }
             },
+            Ok(None) => {
+                if let Err(e) = check_unknown_command(
+                    parsed_command_tokens.command,
+                    parsed_command_tokens.command_args,
+                    true,
+                    RedirectInfo {
+                        special_token: parsed_command_tokens.special_token,
+                        special_token_arg: parsed_command_tokens.special_token_arg,
+                    },
+                ) {
+                    eprintln!("{}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+            }
         }
-    }
+    }    
 }
