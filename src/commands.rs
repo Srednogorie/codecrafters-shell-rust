@@ -20,11 +20,14 @@ pub fn command_type(args: &[String], stdout_writer: &mut dyn Write) -> Result<()
         Ok(Some(cmd)) => writeln!(stdout_writer, "{} is a shell builtin", cmd)?,
         Ok(None) => {
             if let Err(e) = check_unknown_command(
-                command, vec![], false, RedirectInfo { special_token: None, special_token_arg: None }
+                command,
+                vec![],
+                false,
+                RedirectInfo { special_token: None, special_token_arg: None },
             ) {
                 eprintln!("{}", e);
             }
-        },
+        }
         Err(e) => eprintln!("{}", e),
     }
     Ok(())
@@ -35,7 +38,11 @@ pub fn command_pwd(stdout_writer: &mut dyn Write) -> Result<(), std::io::Error> 
     Ok(())
 }
 
-fn command_cd_set_current_dir(std_path: &Path, path: &str, stderr_writer: &mut dyn Write) -> Result<(), std::io::Error> {
+fn command_cd_set_current_dir(
+    std_path: &Path,
+    path: &str,
+    stderr_writer: &mut dyn Write,
+) -> Result<(), std::io::Error> {
     if std::fs::metadata(std_path).is_ok() {
         std::env::set_current_dir(path)?;
     } else {
@@ -51,10 +58,10 @@ pub fn command_cd(path: String, stderr_writer: &mut dyn Write) -> Result<(), std
         command_cd_set_current_dir(std_path, &path, stderr_writer)?;
     } else {
         if std_path.starts_with("~") {
-            let home_dir = dirs::home_dir().ok_or_else(
-                || io::Error::new(io::ErrorKind::NotFound, "home directory not found")
-            )?;
-            let home_str = home_dir.to_str()
+            let home_dir =
+                dirs::home_dir().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "home directory not found"))?;
+            let home_str = home_dir
+                .to_str()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "home directory path is not valid UTF-8"))?;
             command_cd_set_current_dir(home_dir.as_path(), home_str, stderr_writer)?;
         } else {

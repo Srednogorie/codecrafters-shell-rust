@@ -1,8 +1,8 @@
 use rustyline::completion::Completer;
-use rustyline::hint::Hinter;
 use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
-use rustyline::{Helper, Result, Context};
+use rustyline::{Context, Helper, Result};
 use std::fs;
 
 use crate::utils::get_paths;
@@ -21,7 +21,7 @@ impl Completer for ShellCompleter {
         // Find where the current word starts (after the last space, or 0)
         let start = word.rfind(' ').map(|i| i + 1).unwrap_or(0);
         let prefix = &word[start..];
-        
+
         let paths = get_paths().unwrap();
         for path in std::env::split_paths(&paths) {
             if let Ok(entries) = fs::read_dir(&path) {
@@ -37,18 +37,17 @@ impl Completer for ShellCompleter {
             }
         }
 
-        let mut candidates: Vec<String> = builtins
-            .iter()
-            .filter(|cmd| cmd.starts_with(prefix))
-            .map(|s| format!("{} ", s))
-            .collect();
+        let mut candidates: Vec<String> =
+            builtins.iter().filter(|cmd| cmd.starts_with(prefix)).map(|s| format!("{} ", s)).collect();
         candidates.sort();
 
         Ok((start, candidates))
     }
 }
 
-impl Hinter for ShellCompleter { type Hint = String; }
+impl Hinter for ShellCompleter {
+    type Hint = String;
+}
 impl Highlighter for ShellCompleter {}
 impl Validator for ShellCompleter {}
 impl Helper for ShellCompleter {}

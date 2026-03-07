@@ -31,7 +31,7 @@ impl Commands {
             "pwd" => Ok(Some(Commands::Pwd)),
             "cd" => match args.first() {
                 Some(a) => Ok(Some(Commands::Cd(a.clone()))),
-                None    => Err(ShellError::InvalidArguments("cd: missing argument".to_string())),
+                None => Err(ShellError::InvalidArguments("cd: missing argument".to_string())),
             },
             _ => Ok(None),
         }
@@ -54,6 +54,7 @@ pub enum SpecialTokens {
     StdAppend,
     StdAppendExtended,
     ErrAppend,
+    Pipe,
 }
 impl fmt::Display for SpecialTokens {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -64,6 +65,7 @@ impl fmt::Display for SpecialTokens {
             SpecialTokens::StdAppend => ">>",
             Self::StdAppendExtended => "1>>",
             Self::ErrAppend => "2>>",
+            SpecialTokens::Pipe => "|",
         };
         write!(f, "{}", name)
     }
@@ -92,7 +94,7 @@ impl SpecialTokens {
     }
 }
 
- #[derive(Debug)]
+#[derive(Debug)]
 pub enum ShellError {
     IoError(std::io::Error),
     CommandNotFound(String),

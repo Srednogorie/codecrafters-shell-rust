@@ -1,6 +1,9 @@
 use crate::{enums::ShellError, structs::RedirectInfo};
 use std::{
-    ffi::OsString, os::unix::{fs::PermissionsExt, process::CommandExt}, path::PathBuf, process::Stdio
+    ffi::OsString,
+    os::unix::{fs::PermissionsExt, process::CommandExt},
+    path::PathBuf,
+    process::Stdio,
 };
 
 const PERMISSIONS_EXECUTABLE: u32 = 0o111;
@@ -26,7 +29,10 @@ fn find_command_in_path(command: &str) -> Option<PathBuf> {
 }
 
 fn execute_external_command(
-    full_path: &PathBuf, command: &str, args: Vec<String>, redirect_info: RedirectInfo
+    full_path: &PathBuf,
+    command: &str,
+    args: Vec<String>,
+    redirect_info: RedirectInfo,
 ) -> std::io::Result<()> {
     if let Some(token) = redirect_info.special_token {
         let file = token.open_file(redirect_info.special_token_arg.unwrap())?;
@@ -45,7 +51,10 @@ fn execute_external_command(
 }
 
 pub fn check_unknown_command(
-    command: &str, args: Vec<String>, execute: bool, redirect_info: RedirectInfo<'_>
+    command: &str,
+    args: Vec<String>,
+    execute: bool,
+    redirect_info: RedirectInfo<'_>,
 ) -> Result<(), ShellError> {
     match find_command_in_path(command) {
         Some(full_path) => {

@@ -1,25 +1,27 @@
 mod commands;
+mod custom_rustyline;
 mod enums;
 mod structs;
 mod utils;
-mod custom_rustyline;
-
 
 use enums::{Commands, SpecialTokens};
+use rustyline::config::Config;
+use rustyline::{CompletionType, Editor, Result};
 use std::io::{self, Write};
+use std::ops::SubAssign;
 use structs::{ParseCommandTokens, RedirectInfo};
 use utils::check_unknown_command;
-use rustyline::{Editor, Result, CompletionType};
-use rustyline::config::Config;
 
 use crate::custom_rustyline::ShellCompleter;
 
-fn parse_input(input: &str) -> Vec<String> {
+fn parse_input(input: &str) -> Vec<Vec<String>> {
     let input = input.replace("''", "");
     let input = input.replace("\"\"", "");
     // read_line` includes the **newline character** `'\n'` at the end of the input
     // trim it or it's going to sneak into the command
     let input = input.trim();
+
+    let mut tokens_set: Vec<Vec<String>> = Vec::new();
 
     let mut tokens = Vec::new();
 
@@ -72,6 +74,16 @@ fn parse_input(input: &str) -> Vec<String> {
                 }
                 escape_next = true;
             }
+            '|' => {
+                if inside_single_quote || inside_double_quote {
+                    token.push(char);
+                    continue;
+                }
+                tokens_set.push(std::mem::take(&mut tokens));
+                inside_single_quote = false;
+                inside_double_quote = false;
+                escape_next = false;
+            }
             _ => {
                 token.push(char);
             }
@@ -80,8 +92,9 @@ fn parse_input(input: &str) -> Vec<String> {
 
     if !token.is_empty() {
         tokens.push(std::mem::take(&mut token));
+        tokens_set.push(std::mem::take(&mut tokens));
     }
-    tokens
+    tokens_set
 }
 
 fn parse_tokens(iter: &[String]) -> ParseCommandTokens<'_> {
@@ -130,55 +143,94 @@ fn parse_tokens(iter: &[String]) -> ParseCommandTokens<'_> {
 }
 
 fn main() -> Result<()> {
-    let config = Config::builder()
-        .completion_type(CompletionType::List)
-        .build();
+    let config = Config::builder().completion_type(CompletionType::List).build();
     let mut rl = Editor::with_config(config)?;
     rl.set_helper(Some(ShellCompleter));
 
     loop {
         let input = rl.readline("$ ")?;
 
-        let iter = parse_input(&input);
-        if iter.is_empty() {
-            continue;
-        }
+        let iters = parse_input(&input);
 
-        let parsed_command_tokens = parse_tokens(&iter);
+        if iters.len() == 1 {
+            let iter = &iters[0];
 
-        let (mut stdout_writer, mut stderr_writer): (Box<dyn Write>, Box<dyn Write>) = match &parsed_command_tokens
-            .special_token
-        {
-            Some(token) => {
-                let file = Box::new(token.open_file(parsed_command_tokens.special_token_arg.unwrap())?);
-                if token.is_stdout_redirect() { (file, Box::new(io::stderr())) } else { (Box::new(io::stdout()), file) }
+            if iter.is_empty() {
+                continue;
             }
-            None => (Box::new(io::stdout()), Box::new(io::stderr())),
-        };
 
-        match Commands::from_str(parsed_command_tokens.command.as_str(), parsed_command_tokens.command_args.as_slice())
-        {
-            Ok(Some(cmd)) => {
-                if let Err(e) = cmd.execute(&mut *stdout_writer, &mut *stderr_writer) {
+            let parsed_command_tokens = parse_tokens(&iter);
+
+            let (mut stdout_writer, mut stderr_writer): (Box<dyn Write>, Box<dyn Write>) =
+                match &parsed_command_tokens.special_token {
+                    Some(token) => {
+                        let file = Box::new(token.open_file(parsed_command_tokens.special_token_arg.unwrap())?);
+                        if token.is_stdout_redirect() {
+                            (file, Box::new(io::stderr()))
+                        } else {
+                            (Box::new(io::stdout()), file)
+                        }
+                    }
+                    None => (Box::new(io::stdout()), Box::new(io::stderr())),
+                };
+
+            match Commands::from_str(
+                parsed_command_tokens.command.as_str(),
+                parsed_command_tokens.command_args.as_slice(),
+            ) {
+                Ok(Some(cmd)) => {
+                    if let Err(e) = cmd.execute(&mut *stdout_writer, &mut *stderr_writer) {
+                        eprintln!("{}", e);
+                    }
+                }
+                Ok(None) => {
+                    if let Err(e) = check_unknown_command(
+                        parsed_command_tokens.command,
+                        parsed_command_tokens.command_args,
+                        true,
+                        RedirectInfo {
+                            special_token: parsed_command_tokens.special_token,
+                            special_token_arg: parsed_command_tokens.special_token_arg,
+                        },
+                    ) {
+                        eprintln!("{}", e);
+                    }
+                }
+                Err(e) => {
                     eprintln!("{}", e);
                 }
-            },
-            Ok(None) => {
-                if let Err(e) = check_unknown_command(
-                    parsed_command_tokens.command,
-                    parsed_command_tokens.command_args,
-                    true,
-                    RedirectInfo {
-                        special_token: parsed_command_tokens.special_token,
-                        special_token_arg: parsed_command_tokens.special_token_arg,
-                    },
-                ) {
-                    eprintln!("{}", e);
-                }
             }
-            Err(e) => {
-                eprintln!("{}", e);
+        } else {
+            let mut previous_stdout = None;
+            let mut children = Vec::new();
+
+            for (i, cmd) in iters.iter().enumerate() {
+                let mut command = std::process::Command::new(cmd.first().unwrap());
+
+                if cmd.len() > 1 {
+                    command.args(&cmd[1..]);
+                }
+
+                // stdin comes from previous command
+                if let Some(stdout) = previous_stdout.take() {
+                    command.stdin(stdout);
+                }
+
+                // pipe stdout unless this is the last command
+                if i < iters.len() - 1 {
+                    command.stdout(std::process::Stdio::piped());
+                } else {
+                    command.stdout(std::process::Stdio::inherit());
+                }
+
+                let mut child = command.spawn().unwrap();
+                previous_stdout = child.stdout.take().map(std::process::Stdio::from);
+                children.push(child);
+            }
+
+            for mut child in children {
+                child.wait().unwrap();
             }
         }
-    }    
+    }
 }
