@@ -7,11 +7,14 @@ mod utils;
 use enums::{Commands, SpecialTokens};
 use rustyline::config::Config;
 use rustyline::{CompletionType, Editor, Result};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::ops::SubAssign;
+use std::process::Stdio;
 use structs::{ParseCommandTokens, RedirectInfo};
 use utils::check_unknown_command;
+use std::os::unix::io::{FromRawFd, IntoRawFd};
 
+use crate::commands::{command_echo, command_type};
 use crate::custom_rustyline::ShellCompleter;
 
 fn parse_input(input: &str) -> Vec<Vec<String>> {
@@ -201,10 +204,52 @@ fn main() -> Result<()> {
                 }
             }
         } else {
-            let mut previous_stdout = None;
+            let mut previous_stdout: Option<std::fs::File> = None;
             let mut children = Vec::new();
+            
+            let builtins: Vec<String> =
+                vec!["echo", "type", "pwd", "cd"].into_iter().map(String::from).collect();
 
             for (i, cmd) in iters.iter().enumerate() {
+                let cmd_str = cmd.first().unwrap().to_string();
+                
+                if builtins.contains(&cmd_str) {
+                    match cmd_str.as_str() {
+                        "echo" | "type" => {
+                            if i == 0 {
+                                let mut cursor = std::io::Cursor::new(Vec::<u8>::new());
+                                let _ = command_echo(&cmd[1..], &mut cursor);
+                                
+                                // Create an OS pipe - returns (OwnedFd, OwnedFd)
+                                let (read_fd, write_fd) = nix::unistd::pipe().unwrap();
+                                
+                                // Convert OwnedFd to raw fd, then to File
+                                let write_fd_raw = write_fd.into_raw_fd(); // Consumes ownership
+                                let mut write_end = unsafe { std::fs::File::from_raw_fd(write_fd_raw) };
+                                
+                                write_end.write_all(cursor.get_ref()).unwrap();
+                                drop(write_end); // Important! Close write end
+                                
+                                // Same for read end
+                                let read_fd_raw = read_fd.into_raw_fd();
+                                let read_end = unsafe { std::fs::File::from_raw_fd(read_fd_raw) };
+                                previous_stdout = Some(read_end); // Store File, not Stdio::from(read_end)
+                            } else if i == iters.len() - 1 {
+                                if let Some(mut stdin_file) = previous_stdout.take() {
+                                    let mut buf = Vec::new();
+                                    stdin_file.read_to_end(&mut buf).unwrap();
+                                    // let mut cursor = std::io::Cursor::new(buf);
+                                    let _ = command_type(&cmd[1..], &mut std::io::stdout());
+                                    // Note: echo doesn't use stdin, but if you had a builtin that did:
+                                    // let _ = command_wc(&mut cursor, &mut std::io::stdout());
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 let mut command = std::process::Command::new(cmd.first().unwrap());
 
                 if cmd.len() > 1 {
@@ -213,7 +258,7 @@ fn main() -> Result<()> {
 
                 // stdin comes from previous command
                 if let Some(stdout) = previous_stdout.take() {
-                    command.stdin(stdout);
+                    command.stdin(Stdio::from(stdout)); // Convert File → Stdio here instead
                 }
 
                 // pipe stdout unless this is the last command
@@ -224,7 +269,9 @@ fn main() -> Result<()> {
                 }
 
                 let mut child = command.spawn().unwrap();
-                previous_stdout = child.stdout.take().map(std::process::Stdio::from);
+                previous_stdout = child.stdout.take().map(|stdout| {
+                    unsafe { std::fs::File::from_raw_fd(stdout.into_raw_fd()) }
+                });
                 children.push(child);
             }
 

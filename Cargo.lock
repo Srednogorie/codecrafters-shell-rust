@@ -48,6 +48,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "dirs",
+ "nix 0.31.2",
  "rustyline",
  "thiserror 1.0.63",
 ]
@@ -181,6 +182,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.31.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d6d0705320c1e6ba1d912b5e37cf18071b6c2e9b7fa8215a1e8a7651966f5d3"
+dependencies = [
+ "bitflags",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+]
+
+[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -252,7 +265,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix",
+ "nix 0.30.1",
  "radix_trie",
  "unicode-segmentation",
  "unicode-width",
