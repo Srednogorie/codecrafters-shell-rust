@@ -1,5 +1,4 @@
 use crate::enums::Commands;
-use crate::structs::RedirectInfo;
 use crate::utils::*;
 use std::io::{self, Write};
 use std::path::Path;
@@ -18,16 +17,14 @@ pub fn command_type(args: &[String], stdout_writer: &mut dyn Write) -> Result<()
     let command_enum = Commands::from_str(command, args);
     match command_enum {
         Ok(Some(cmd)) => writeln!(stdout_writer, "{} is a shell builtin", cmd)?,
-        Ok(None) => {
-            if let Err(e) = check_unknown_command(
-                command,
-                vec![],
-                false,
-                RedirectInfo { special_token: None, special_token_arg: None },
-            ) {
-                eprintln!("{}", e);
+        Ok(None) => match find_in_path(command) {
+            Some(full_path) => {
+                writeln!(stdout_writer, "{} is {}", command, full_path.display())?;
             }
-        }
+            None => {
+                eprintln!("{}: not found", command);
+            }
+        },
         Err(e) => eprintln!("{}", e),
     }
     Ok(())
@@ -71,5 +68,9 @@ pub fn command_cd(path: String, stderr_writer: &mut dyn Write) -> Result<(), std
             command_cd_set_current_dir(new_dir, &path, stderr_writer)?;
         }
     }
+    Ok(())
+}
+
+pub fn command_history() -> Result<(), std::io::Error> {
     Ok(())
 }

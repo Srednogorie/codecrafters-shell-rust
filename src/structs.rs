@@ -1,13 +1,12 @@
 use crate::enums::SpecialTokens;
 
-pub struct RedirectInfo<'a> {
-    pub special_token: Option<SpecialTokens>,
-    pub special_token_arg: Option<&'a str>,
+pub struct PipelineStage {
+    pub command: String,
+    pub args: Vec<String>,
+    pub redirect: Option<Redirect>, // stdout/stderr redirect for this stage
 }
 
-pub struct ParseCommandTokens<'a> {
-    pub command: &'a String,
-    pub command_args: Vec<String>,
-    pub special_token: Option<SpecialTokens>,
-    pub special_token_arg: Option<&'a str>,
+pub struct Redirect {
+    pub token: SpecialTokens,
+    pub target: String, // the file path, owned
 }

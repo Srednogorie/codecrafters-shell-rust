@@ -1,9 +1,9 @@
-use crate::{enums::ShellError, structs::RedirectInfo};
+use crate::structs::PipelineStage;
 use std::{
     ffi::OsString,
     os::unix::{fs::PermissionsExt, process::CommandExt},
     path::PathBuf,
-    process::Stdio,
+    process::{Child, Stdio},
 };
 
 const PERMISSIONS_EXECUTABLE: u32 = 0o111;
@@ -13,7 +13,7 @@ pub fn get_paths() -> Option<OsString> {
     std::env::var_os(PATH_KEY)
 }
 
-fn find_command_in_path(command: &str) -> Option<PathBuf> {
+pub fn find_in_path(command: &str) -> Option<PathBuf> {
     let paths = get_paths()?;
 
     for path in std::env::split_paths(&paths) {
@@ -28,45 +28,27 @@ fn find_command_in_path(command: &str) -> Option<PathBuf> {
     None
 }
 
-fn execute_external_command(
-    full_path: &PathBuf,
-    command: &str,
-    args: Vec<String>,
-    redirect_info: RedirectInfo,
-) -> std::io::Result<()> {
-    if let Some(token) = redirect_info.special_token {
-        let file = token.open_file(redirect_info.special_token_arg.unwrap())?;
-        let mut cmd = std::process::Command::new(&full_path);
-        cmd.arg0(command).args(args);
-        if token.is_stdout_redirect() {
+pub fn execute_external(stage: &PipelineStage, stdin: Stdio, stdout: Stdio, stderr: Stdio) -> std::io::Result<Child> {
+    let full_path = find_in_path(&stage.command)
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("{}: not found", stage.command)))?;
+
+    let mut cmd = std::process::Command::new(&full_path);
+    cmd.arg0(&stage.command).args(&stage.args);
+    cmd.stdin(stdin);
+
+    if let Some(redirect) = &stage.redirect {
+        let file = redirect.token.open_file(&redirect.target)?;
+        if redirect.token.is_stdout_redirect() {
             cmd.stdout(Stdio::from(file));
+            cmd.stderr(stderr);
         } else {
+            cmd.stdout(stdout);
             cmd.stderr(Stdio::from(file));
         }
-        cmd.status()?;
     } else {
-        std::process::Command::new(&full_path).arg0(command).args(args).status()?;
+        cmd.stdout(stdout);
+        cmd.stderr(stderr);
     }
-    Ok(())
-}
 
-pub fn check_unknown_command(
-    command: &str,
-    args: Vec<String>,
-    execute: bool,
-    redirect_info: RedirectInfo<'_>,
-) -> Result<(), ShellError> {
-    match find_command_in_path(command) {
-        Some(full_path) => {
-            if execute {
-                execute_external_command(&full_path, command, args, redirect_info)?;
-            } else {
-                println!("{} is {}", command, full_path.display());
-            }
-        }
-        None => {
-            return Err(ShellError::CommandNotFound(command.to_string()));
-        }
-    }
-    Ok(())
+    cmd.spawn()
 }
