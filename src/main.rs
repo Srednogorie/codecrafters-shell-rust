@@ -12,7 +12,7 @@ use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::process::Stdio;
 
 use crate::custom_rustyline::ShellCompleter;
-use crate::structs::{PipelineStage, Redirect};
+use crate::structs::{History, PipelineStage, Redirect};
 use crate::utils::execute_external;
 
 fn tokens_to_stage(tokens: Vec<String>) -> PipelineStage {
@@ -158,9 +158,10 @@ fn parse_input(input: &str) -> Vec<PipelineStage> {
     tokens_set
 }
 
-fn execute_pipeline(stages: Vec<PipelineStage>) -> Result<()> {
+fn execute_pipeline(stages: Vec<PipelineStage>, history: &History) -> Result<()> {
     let mut previous_stdout: Option<std::fs::File> = None;
     let mut children = Vec::new();
+    
 
     for (i, stage) in stages.iter().enumerate() {
         let stdin = match previous_stdout.take() {
@@ -174,7 +175,7 @@ fn execute_pipeline(stages: Vec<PipelineStage>) -> Result<()> {
             Ok(Some(cmd)) => {
                 let mut stdout_cursor = std::io::Cursor::new(Vec::<u8>::new());
                 let mut stderr_cursor = std::io::Cursor::new(Vec::<u8>::new());
-                let _ = cmd.execute(&mut stdout_cursor, &mut stderr_cursor);
+                let _ = cmd.execute(&mut stdout_cursor, &mut stderr_cursor, &history);
 
                 if i < stages.len() - 1 {
                     // not the last stage — feed output into a pipe
@@ -233,13 +234,15 @@ fn main() -> Result<()> {
     let config = Config::builder().completion_type(CompletionType::List).build();
     let mut rl = Editor::with_config(config)?;
     rl.set_helper(Some(ShellCompleter));
+    let mut history = History::new();
     loop {
         let input = rl.readline("$ ")?;
         let stages = parse_input(&input);
         if stages.is_empty() {
             continue;
         }
-        if let Err(e) = execute_pipeline(stages) {
+        history.add_entry(input);
+        if let Err(e) = execute_pipeline(stages, &history) {
             eprintln!("{}", e);
         }
     }

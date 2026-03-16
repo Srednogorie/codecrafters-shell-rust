@@ -1,4 +1,5 @@
 use crate::commands::{command_cd, command_echo, command_exit, command_pwd, command_type, command_history};
+use crate::structs::History;
 use std::fmt;
 use std::fs::File;
 use std::io::Write;
@@ -39,14 +40,19 @@ impl Commands {
             _ => Ok(None),
         }
     }
-    pub fn execute(&self, stdout_writer: &mut dyn Write, stderr_writer: &mut dyn Write) -> Result<(), std::io::Error> {
+    pub fn execute(
+        &self,
+        stdout_writer: &mut dyn Write,
+        stderr_writer: &mut dyn Write,
+        history: &History,
+    ) -> Result<(), std::io::Error> {
         match self {
             Commands::Echo(args) => command_echo(args, stdout_writer),
             Commands::Type(args) => command_type(args, stdout_writer),
             Commands::Pwd => command_pwd(stdout_writer),
             Commands::Exit => command_exit(),
             Commands::Cd(path) => command_cd(path.to_string(), stderr_writer),
-            Commands::History => command_history(),
+            Commands::History => command_history(&history, stdout_writer),
         }
     }
 }

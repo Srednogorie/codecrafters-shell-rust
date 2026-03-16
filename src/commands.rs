@@ -1,4 +1,5 @@
 use crate::enums::Commands;
+use crate::structs::History;
 use crate::utils::*;
 use std::io::{self, Write};
 use std::path::Path;
@@ -71,6 +72,9 @@ pub fn command_cd(path: String, stderr_writer: &mut dyn Write) -> Result<(), std
     Ok(())
 }
 
-pub fn command_history() -> Result<(), std::io::Error> {
+pub fn command_history(history: &History, stdout_writer: &mut dyn Write) -> Result<(), std::io::Error> {
+    for (i, entry) in history.get_iter().enumerate() {
+        writeln!(stdout_writer, "    {}  {}", i + 1, entry)?;
+    }
     Ok(())
 }
