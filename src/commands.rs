@@ -72,8 +72,14 @@ pub fn command_cd(path: String, stderr_writer: &mut dyn Write) -> Result<(), std
     Ok(())
 }
 
-pub fn command_history(history: &History, stdout_writer: &mut dyn Write) -> Result<(), std::io::Error> {
-    for (i, entry) in history.get_iter().enumerate() {
+pub fn command_history(
+    args: &[String],
+    history: &History,
+    stdout_writer: &mut dyn Write,
+) -> Result<(), std::io::Error> {
+    let iter_count = history.get_iter().count();
+    let max_entries = args.first().and_then(|a| a.parse::<usize>().ok()).unwrap_or(iter_count);
+    for (i, entry) in history.get_iter().enumerate().skip(iter_count - max_entries) {
         writeln!(stdout_writer, "    {}  {}", i + 1, entry)?;
     }
     Ok(())

@@ -10,7 +10,7 @@ pub enum Commands {
     Exit,
     Pwd,
     Cd(String),
-    History,
+    History(Vec<String>),
 }
 impl fmt::Display for Commands {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -20,7 +20,7 @@ impl fmt::Display for Commands {
             Commands::Exit => "exit",
             Commands::Pwd => "pwd",
             Commands::Cd(_) => "cd",
-            Commands::History => "history",
+            Commands::History(_) => "history",
         };
         write!(f, "{}", name)
     }
@@ -36,7 +36,7 @@ impl Commands {
                 Some(a) => Ok(Some(Commands::Cd(a.clone()))),
                 None => Err(ShellError::InvalidArguments("cd: missing argument".to_string())),
             },
-            "history" => Ok(Some(Commands::History)),
+            "history" => Ok(Some(Commands::History(args.to_vec()))),
             _ => Ok(None),
         }
     }
@@ -52,7 +52,7 @@ impl Commands {
             Commands::Pwd => command_pwd(stdout_writer),
             Commands::Exit => command_exit(),
             Commands::Cd(path) => command_cd(path.to_string(), stderr_writer),
-            Commands::History => command_history(&history, stdout_writer),
+            Commands::History(args) => command_history(args, &history, stdout_writer),
         }
     }
 }
