@@ -1,5 +1,6 @@
+use rustyline::history::{FileHistory, History};
+
 use crate::enums::Commands;
-use crate::structs::History;
 use crate::utils::*;
 use std::io::{self, Write};
 use std::path::Path;
@@ -74,12 +75,12 @@ pub fn command_cd(path: String, stderr_writer: &mut dyn Write) -> Result<(), std
 
 pub fn command_history(
     args: &[String],
-    history: &History,
+    history: &FileHistory,
     stdout_writer: &mut dyn Write,
 ) -> Result<(), std::io::Error> {
-    let iter_count = history.get_iter().count();
+    let iter_count = history.len();
     let max_entries = args.first().and_then(|a| a.parse::<usize>().ok()).unwrap_or(iter_count);
-    for (i, entry) in history.get_iter().enumerate().skip(iter_count - max_entries) {
+    for (i, entry) in history.iter().enumerate().skip(iter_count - max_entries) {
         writeln!(stdout_writer, "    {}  {}", i + 1, entry)?;
     }
     Ok(())

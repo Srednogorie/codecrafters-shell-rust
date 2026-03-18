@@ -6,13 +6,15 @@ mod utils;
 
 use enums::{Commands, SpecialTokens};
 use rustyline::config::Config;
+use rustyline::error::ReadlineError;
+use rustyline::history::FileHistory;
 use rustyline::{CompletionType, Editor, Result};
 use std::io::{self, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::process::Stdio;
 
 use crate::custom_rustyline::ShellCompleter;
-use crate::structs::{History, PipelineStage, Redirect};
+use crate::structs::{PipelineStage, Redirect};
 use crate::utils::execute_external;
 
 fn tokens_to_stage(tokens: Vec<String>) -> PipelineStage {
@@ -158,7 +160,7 @@ fn parse_input(input: &str) -> Vec<PipelineStage> {
     tokens_set
 }
 
-fn execute_pipeline(stages: Vec<PipelineStage>, history: &History) -> Result<()> {
+fn execute_pipeline(stages: Vec<PipelineStage>, history: &FileHistory) -> Result<()> {
     let mut previous_stdout: Option<std::fs::File> = None;
     let mut children = Vec::new();
     
@@ -234,16 +236,33 @@ fn main() -> Result<()> {
     let config = Config::builder().completion_type(CompletionType::List).build();
     let mut rl = Editor::with_config(config)?;
     rl.set_helper(Some(ShellCompleter));
-    let mut history = History::new();
+    let _ = rl.load_history("history.txt");
     loop {
-        let input = rl.readline("$ ")?;
-        let stages = parse_input(&input);
-        if stages.is_empty() {
-            continue;
-        }
-        history.add_entry(input);
-        if let Err(e) = execute_pipeline(stages, &history) {
-            eprintln!("{}", e);
+        let input = rl.readline("$ ");
+
+        match input {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str())?;
+                let stages = parse_input(&line);
+                if stages.is_empty() {
+                    continue;
+                }
+                if let Err(e) = execute_pipeline(stages, rl.history()) {
+                    eprintln!("{}", e);
+                }
+            },
+            Err(ReadlineError::Interrupted) => {
+                break
+            },
+            Err(ReadlineError::Eof) => {
+                break
+            },
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break
+            }
         }
     }
+    rl.save_history("history.txt");
+    Ok(())
 }

@@ -1,5 +1,6 @@
+use rustyline::history::FileHistory;
+
 use crate::commands::{command_cd, command_echo, command_exit, command_pwd, command_type, command_history};
-use crate::structs::History;
 use std::fmt;
 use std::fs::File;
 use std::io::Write;
@@ -44,7 +45,7 @@ impl Commands {
         &self,
         stdout_writer: &mut dyn Write,
         stderr_writer: &mut dyn Write,
-        history: &History,
+        history: &FileHistory,
     ) -> Result<(), std::io::Error> {
         match self {
             Commands::Echo(args) => command_echo(args, stdout_writer),
