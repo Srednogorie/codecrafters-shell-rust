@@ -242,6 +242,17 @@ fn main() -> Result<()> {
 
         match input {
             Ok(line) => {
+                if line.starts_with("history -r") {
+                    let history_file = line.trim_start_matches("history -r ");
+                    let _ = rl.load_history(history_file);
+                    let existing_history: Vec<String> = rl.history().iter().map(|s| s.to_string()).collect();
+                    let _ = rl.clear_history();
+                    rl.add_history_entry(line.as_str())?;
+                    for entry in existing_history {
+                        rl.add_history_entry(entry.as_str())?;
+                    }
+                    continue;
+                }
                 rl.add_history_entry(line.as_str())?;
                 let stages = parse_input(&line);
                 if stages.is_empty() {
@@ -263,6 +274,6 @@ fn main() -> Result<()> {
             }
         }
     }
-    rl.save_history("history.txt");
+    let _ = rl.save_history("history.txt");
     Ok(())
 }
