@@ -1,3 +1,5 @@
 echo hello
 echo world
 history -w tt.txt
+echo new_command
+history -a tt.txt
