@@ -238,6 +238,11 @@ fn main() -> Result<()> {
     let mut rl = Editor::with_config(config)?;
     rl.set_helper(Some(ShellCompleter));
     let _ = rl.load_history("history.txt");
+    if let Ok(var) = std::env::var("HISTFILE") {
+        let _ = rl.clear_history();
+        let _ = rl.load_history(&var);
+    }
+    
     loop {
         let input = rl.readline("$ ");
 
@@ -303,6 +308,10 @@ fn main() -> Result<()> {
             }
         }
     }
-    let _ = rl.save_history("history.txt");
+    if let Ok(var) = std::env::var("HISTFILE") {
+        let _ = rl.save_history(&var);
+    } else {
+        let _ = rl.save_history("history.txt");
+    }
     Ok(())
 }
