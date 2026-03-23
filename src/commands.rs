@@ -13,12 +13,13 @@ pub fn command_echo(args: &[String], stdout_writer: &mut dyn Write) -> Result<()
 
 pub fn command_exit(history: &mut FileHistory) -> Result<(), std::io::Error> {
     if let Ok(var) = std::env::var("HISTFILE") {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            // .append(true)
+            .open(&var)?;
         for line in history.iter() {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .append(true)
-                .open(&var)?;
             writeln!(file, "{}", line)?;
         }
     }
