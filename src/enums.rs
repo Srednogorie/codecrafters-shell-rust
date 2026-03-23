@@ -45,13 +45,13 @@ impl Commands {
         &self,
         stdout_writer: &mut dyn Write,
         stderr_writer: &mut dyn Write,
-        history: &FileHistory,
+        history: &mut FileHistory,
     ) -> Result<(), std::io::Error> {
         match self {
             Commands::Echo(args) => command_echo(args, stdout_writer),
             Commands::Type(args) => command_type(args, stdout_writer),
             Commands::Pwd => command_pwd(stdout_writer),
-            Commands::Exit => command_exit(),
+            Commands::Exit => command_exit(history),
             Commands::Cd(path) => command_cd(path.to_string(), stderr_writer),
             Commands::History(args) => command_history(args, &history, stdout_writer),
         }

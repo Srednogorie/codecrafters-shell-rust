@@ -2,6 +2,7 @@ use rustyline::history::{FileHistory, History};
 
 use crate::enums::Commands;
 use crate::utils::*;
+use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -10,7 +11,17 @@ pub fn command_echo(args: &[String], stdout_writer: &mut dyn Write) -> Result<()
     Ok(())
 }
 
-pub fn command_exit() -> Result<(), std::io::Error> {
+pub fn command_exit(history: &mut FileHistory) -> Result<(), std::io::Error> {
+    if let Ok(var) = std::env::var("HISTFILE") {
+        for line in history.iter() {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(true)
+                .open(&var)?;
+            writeln!(file, "{}", line)?;
+        }
+    }
     std::process::exit(0);
 }
 

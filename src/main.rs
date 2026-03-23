@@ -161,7 +161,7 @@ fn parse_input(input: &str) -> Vec<PipelineStage> {
     tokens_set
 }
 
-fn execute_pipeline(stages: Vec<PipelineStage>, history: &FileHistory) -> Result<()> {
+fn execute_pipeline(stages: Vec<PipelineStage>, history: &mut FileHistory) -> Result<()> {
     let mut previous_stdout: Option<std::fs::File> = None;
     let mut children = Vec::new();
     
@@ -178,7 +178,7 @@ fn execute_pipeline(stages: Vec<PipelineStage>, history: &FileHistory) -> Result
             Ok(Some(cmd)) => {
                 let mut stdout_cursor = std::io::Cursor::new(Vec::<u8>::new());
                 let mut stderr_cursor = std::io::Cursor::new(Vec::<u8>::new());
-                let _ = cmd.execute(&mut stdout_cursor, &mut stderr_cursor, &history);
+                let _ = cmd.execute(&mut stdout_cursor, &mut stderr_cursor, history);
 
                 if i < stages.len() - 1 {
                     // not the last stage — feed output into a pipe
@@ -292,7 +292,7 @@ fn main() -> Result<()> {
                 if stages.is_empty() {
                     continue;
                 }
-                if let Err(e) = execute_pipeline(stages, rl.history()) {
+                if let Err(e) = execute_pipeline(stages, rl.history_mut()) {
                     eprintln!("{}", e);
                 }
             },
