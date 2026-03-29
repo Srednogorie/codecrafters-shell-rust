@@ -46,14 +46,35 @@ impl Completer for ShellCompleter {
     
             Ok((start, candidates))
         } else {
-            let paths = fs::read_dir("./").unwrap();
-        
-            let candidates: Vec<String> = paths
-                .flatten()
-                .filter(|path| path.file_name().into_string().unwrap_or_default().starts_with(prefix))
-                .map(|path| format!("{} ", path.file_name().into_string().unwrap_or_default()))
-                .collect();
-            Ok((start, candidates))
+            // for entry in paths.flatten() {
+            //     let path = entry.path();
+            //     println!("{:?}", path.);
+            //     // println!("{}", entry.file_name().into_string().unwrap_or_default());
+            // }
+            // let candidates: Vec<String> = Vec::new();
+            let split_prefix: Vec<&str> = prefix.split("/").collect();
+            let mut pre = split_prefix[..split_prefix.len() - 1].join("/");
+            if pre.is_empty() {
+                pre = "./".to_string();
+            }
+            let post = split_prefix.last().unwrap();
+            let paths = fs::read_dir(&pre).unwrap();
+            
+            if pre == "./" {
+                let candidates: Vec<String> = paths
+                    .flatten()
+                    .filter(|path| path.file_name().into_string().unwrap_or_default().starts_with(post))
+                    .map(|path| format!("{} ", path.file_name().into_string().unwrap_or_default()))
+                    .collect();
+                Ok((start, candidates))
+            } else {
+                let candidates: Vec<String> = paths
+                    .flatten()
+                    .filter(|path| path.file_name().into_string().unwrap_or_default().starts_with(post))
+                    .map(|path| format!("{}/{} ", pre, path.file_name().into_string().unwrap_or_default()))
+                    .collect();
+                Ok((start, candidates))
+            }
         }
     }
 }

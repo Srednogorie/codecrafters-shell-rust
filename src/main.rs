@@ -8,7 +8,7 @@ use enums::{Commands, SpecialTokens};
 use rustyline::config::Config;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
-use rustyline::{CompletionType, Editor, Result};
+use rustyline::{CompletionType, Editor, Result, HistoryDuplicates};
 use std::io::{self, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::process::Stdio;
@@ -233,7 +233,10 @@ fn execute_pipeline(stages: Vec<PipelineStage>, history: &mut FileHistory) -> Re
 }
 
 fn main() -> Result<()> {
-    let config = Config::builder().completion_type(CompletionType::List).build();
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .history_ignore_dups(false)?
+        .build();
     let mut rl = Editor::with_config(config)?;
     rl.set_helper(Some(ShellCompleter));
     let _ = rl.load_history("history.txt");
