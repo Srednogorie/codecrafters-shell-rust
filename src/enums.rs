@@ -1,17 +1,52 @@
 use rustyline::history::FileHistory;
 
 use crate::commands::{command_cd, command_echo, command_exit, command_pwd, command_type, command_history};
-use std::fmt;
+use std::{fmt};
 use std::fs::File;
 use std::io::Write;
 
+#[derive(Debug)]
+pub enum HistoryFlags {
+    Read,
+    Write,
+    Append,
+}
+impl fmt::Display for HistoryFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            HistoryFlags::Read => "-r",
+            HistoryFlags::Write => "-w",
+            HistoryFlags::Append => "-a",
+        };
+        write!(f, "{}", name)
+    }
+}
+impl HistoryFlags {
+    pub fn from_str(flag: &str) -> Result<HistoryFlags, ShellError> {
+        match flag {
+            "-r" => Ok(HistoryFlags::Read),
+            "-w" => Ok(HistoryFlags::Write),
+            "-a" => Ok(HistoryFlags::Append),
+            _ => Err(ShellError::InvalidFlag(flag.to_string())),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum HistoryArgs {
+    Limit(usize),
+    File(HistoryFlags, String),
+    PrintAll,
+}
+
+#[derive(Debug)]
 pub enum Commands {
     Echo(Vec<String>),
     Type(Vec<String>),
     Exit,
     Pwd,
     Cd(String),
-    History(Vec<String>),
+    History(HistoryArgs),
 }
 impl fmt::Display for Commands {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -37,7 +72,17 @@ impl Commands {
                 Some(a) => Ok(Some(Commands::Cd(a.clone()))),
                 None => Err(ShellError::InvalidArguments("cd: missing argument".to_string())),
             },
-            "history" => Ok(Some(Commands::History(args.to_vec()))),
+            "history" => match args.first() {
+                Some(value) => match HistoryFlags::from_str(value) {
+                    Ok(flag) => Ok(Some(Commands::History(HistoryArgs::File(flag, args[1].clone())))),
+                    _ => Ok(Some(Commands::History(HistoryArgs::Limit(
+                        value.parse::<usize>().map_err(
+                            |_| ShellError::InvalidArguments(format!("history: invalid argument: {}", value))
+                        )?
+                    )))),
+                },
+                None => Ok(Some(Commands::History(HistoryArgs::PrintAll))),
+            },
             _ => Ok(None),
         }
     }
@@ -51,9 +96,10 @@ impl Commands {
             Commands::Echo(args) => command_echo(args, stdout_writer),
             Commands::Type(args) => command_type(args, stdout_writer),
             Commands::Pwd => command_pwd(stdout_writer),
+            // TODO: Refactor possibly here
             Commands::Exit => command_exit(history),
             Commands::Cd(path) => command_cd(path.to_string(), stderr_writer),
-            Commands::History(args) => command_history(args, &history, stdout_writer),
+            Commands::History(args) => command_history(args, history, stdout_writer),
         }
     }
 }
@@ -110,6 +156,7 @@ pub enum ShellError {
     IoError(std::io::Error),
     CommandNotFound(String),
     InvalidArguments(String),
+    InvalidFlag(String),
 }
 impl fmt::Display for ShellError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -117,6 +164,7 @@ impl fmt::Display for ShellError {
             ShellError::IoError(err) => write!(f, "IO error: {}", err),
             ShellError::CommandNotFound(cmd) => write!(f, "{}: not found", cmd),
             ShellError::InvalidArguments(args) => write!(f, "Invalid arguments: {}", args),
+            ShellError::InvalidFlag(flag) => write!(f, "Invalid flag: {}", flag),
         }
     }
 }

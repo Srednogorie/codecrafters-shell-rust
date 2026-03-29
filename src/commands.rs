@@ -1,6 +1,6 @@
 use rustyline::history::{FileHistory, History};
 
-use crate::enums::Commands;
+use crate::enums::{Commands, HistoryArgs, HistoryFlags};
 use crate::utils::*;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -17,7 +17,6 @@ pub fn command_exit(history: &mut FileHistory) -> Result<(), std::io::Error> {
             .write(true)
             .create(true)
             .truncate(true)
-            // .append(true)
             .open(&var)?;
         for line in history.iter() {
             writeln!(file, "{}", line)?;
@@ -28,7 +27,7 @@ pub fn command_exit(history: &mut FileHistory) -> Result<(), std::io::Error> {
 
 pub fn command_type(args: &[String], stdout_writer: &mut dyn Write) -> Result<(), std::io::Error> {
     let command = args.first().map(|s| s.as_str()).unwrap_or("");
-    let command_enum = Commands::from_str(command, args);
+    let command_enum = Commands::from_str(command, &args[1..]);
     match command_enum {
         Ok(Some(cmd)) => writeln!(stdout_writer, "{} is a shell builtin", cmd)?,
         Ok(None) => match find_in_path(command) {
@@ -86,14 +85,56 @@ pub fn command_cd(path: String, stderr_writer: &mut dyn Write) -> Result<(), std
 }
 
 pub fn command_history(
-    args: &[String],
-    history: &FileHistory,
+    args: &HistoryArgs,
+    history: &mut FileHistory,
     stdout_writer: &mut dyn Write,
 ) -> Result<(), std::io::Error> {
-    let iter_count = history.len();
-    let max_entries = args.first().and_then(|a| a.parse::<usize>().ok()).unwrap_or(iter_count);
-    for (i, entry) in history.iter().enumerate().skip(iter_count - max_entries) {
-        writeln!(stdout_writer, "    {}  {}", i + 1, entry)?;
+    match args {
+        HistoryArgs::Limit(max_entries) => {
+            let iter_count = history.len();
+            for (i, entry) in history.iter().enumerate().skip(iter_count - max_entries) {
+                writeln!(stdout_writer, "    {}  {}", i + 1, entry)?;
+            }
+        }
+        HistoryArgs::File(flag, file_path) => {
+            match flag {
+                HistoryFlags::Read => {
+                    let _ = history.load(Path::new(file_path));
+                    let existing_history: Vec<String> = history.iter().map(|s| s.to_string()).collect();
+                    let _ = history.clear();
+                    for entry in existing_history {
+                        let _ = history.add(entry.as_str());
+                    }
+                }
+                HistoryFlags::Write => {
+                    let existing_history: Vec<String> = history.iter().map(|s| s.to_string()).collect();
+                    let mut file = OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create_new(true)
+                        .open(file_path)?;
+                    for entry in existing_history {
+                        writeln!(file, "{}", entry)?;
+                    }
+                }
+                HistoryFlags::Append => {
+                    let existing_history: Vec<String> = history.iter().map(|s| s.to_string()).collect();
+                    let mut file = OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .open(file_path)?;
+                    for entry in existing_history {
+                        writeln!(file, "{}", entry)?;
+                    }
+                    let _ = history.clear();
+                }
+            }
+        }
+        HistoryArgs::PrintAll => {
+            for (i, entry) in history.iter().enumerate() {
+                writeln!(stdout_writer, "    {}  {}", i + 1, entry)?;
+            }
+        }
     }
     Ok(())
 }

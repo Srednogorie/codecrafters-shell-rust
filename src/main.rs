@@ -9,7 +9,6 @@ use rustyline::config::Config;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
 use rustyline::{CompletionType, Editor, Result};
-use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::process::Stdio;
@@ -248,45 +247,6 @@ fn main() -> Result<()> {
 
         match input {
             Ok(line) => {
-                if line.starts_with("history -r") {
-                    let history_file = line.trim_start_matches("history -r ");
-                    let _ = rl.load_history(history_file);
-                    let existing_history: Vec<String> = rl.history().iter().map(|s| s.to_string()).collect();
-                    let _ = rl.clear_history();
-                    rl.add_history_entry(line.as_str())?;
-                    for entry in existing_history {
-                        rl.add_history_entry(entry.as_str())?;
-                    }
-                    continue;
-                } else if line.starts_with("history -w") {
-                    let history_file = line.trim_start_matches("history -w ");
-                    rl.add_history_entry(line.as_str())?;
-                    let existing_history: Vec<String> = rl.history().iter().map(|s| s.to_string()).collect();
-                    let mut file = OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .create_new(true)
-                        .open(history_file)
-                        .expect("file.txt doesn't exist or so");
-                    for entry in existing_history {
-                        writeln!(file, "{}", entry)?;
-                    }
-                    continue;
-                } else if line.starts_with("history -a") {
-                    let history_file = line.trim_start_matches("history -a ");
-                    rl.add_history_entry(line.as_str())?;
-                    let existing_history: Vec<String> = rl.history().iter().map(|s| s.to_string()).collect();
-                    let mut file = OpenOptions::new()
-                        .write(true)
-                        .append(true)
-                        .open(history_file)
-                        .expect("file.txt doesn't exist or so");
-                    for entry in existing_history {
-                        writeln!(file, "{}", entry)?;
-                    }
-                    let _ = rl.clear_history();
-                    continue;
-                }
                 rl.add_history_entry(line.as_str())?;
                 let stages = parse_input(&line);
                 if stages.is_empty() {
