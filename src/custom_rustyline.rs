@@ -3,6 +3,7 @@ use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
 use rustyline::{Context, Helper, Result};
+use std::fmt::format;
 use std::io::Write;
 use std::{fs, io};
 
@@ -46,12 +47,6 @@ impl Completer for ShellCompleter {
     
             Ok((start, candidates))
         } else {
-            // for entry in paths.flatten() {
-            //     let path = entry.path();
-            //     println!("{:?}", path.);
-            //     // println!("{}", entry.file_name().into_string().unwrap_or_default());
-            // }
-            // let candidates: Vec<String> = Vec::new();
             let split_prefix: Vec<&str> = prefix.split("/").collect();
             let mut pre = split_prefix[..split_prefix.len() - 1].join("/");
             if pre.is_empty() {
@@ -60,21 +55,30 @@ impl Completer for ShellCompleter {
             let post = split_prefix.last().unwrap();
             let paths = fs::read_dir(&pre).unwrap();
             
-            if pre == "./" {
-                let candidates: Vec<String> = paths
-                    .flatten()
-                    .filter(|path| path.file_name().into_string().unwrap_or_default().starts_with(post))
-                    .map(|path| format!("{} ", path.file_name().into_string().unwrap_or_default()))
-                    .collect();
-                Ok((start, candidates))
-            } else {
-                let candidates: Vec<String> = paths
-                    .flatten()
-                    .filter(|path| path.file_name().into_string().unwrap_or_default().starts_with(post))
-                    .map(|path| format!("{}/{} ", pre, path.file_name().into_string().unwrap_or_default()))
-                    .collect();
-                Ok((start, candidates))
-            }
+            let candidates: Vec<String> = paths
+                .flatten()
+                .filter(|path| {
+                    path.file_name().into_string().unwrap_or_default().starts_with(post)
+                })
+                .map(|path| {
+                    let name = path.file_name().into_string().unwrap_or_default();
+                    if pre == "./" {
+                        if path.path().is_dir() {
+                            format!("{}/", name)
+                        } else {
+                            format!("{} ", name)
+                        }
+                    } else {
+                        if path.path().is_dir() {
+                            format!("{}/{}/", pre, name)
+                        } else {
+                            format!("{}/{} ", pre, name)
+                        }
+                    }
+                })
+                .collect();
+            
+            Ok((start, candidates))
         }
     }
 }
