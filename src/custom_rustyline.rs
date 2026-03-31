@@ -77,6 +77,9 @@ impl Completer for ShellCompleter {
                     }
                 })
                 .collect();
+            if candidates.len() > 1 {
+                print!("\x07");
+            }
             
             Ok((start, candidates))
         }
