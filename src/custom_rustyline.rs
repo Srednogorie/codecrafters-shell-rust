@@ -55,7 +55,7 @@ impl Completer for ShellCompleter {
             let post = split_prefix.last().unwrap();
             let paths = fs::read_dir(&pre).unwrap();
             
-            let candidates: Vec<String> = paths
+            let mut candidates: Vec<String> = paths
                 .flatten()
                 .filter(|path| {
                     path.file_name().into_string().unwrap_or_default().starts_with(post)
@@ -77,6 +77,7 @@ impl Completer for ShellCompleter {
                     }
                 })
                 .collect();
+            candidates.sort();
             if candidates.len() > 1 {
                 print!("\x07");
             }
