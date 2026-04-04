@@ -3,9 +3,7 @@ use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
 use rustyline::{Context, Helper, Result};
-use std::fmt::format;
-use std::io::Write;
-use std::{fs, io};
+use std::fs;
 
 use crate::utils::get_paths;
 

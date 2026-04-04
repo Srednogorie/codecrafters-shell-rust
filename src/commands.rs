@@ -138,3 +138,8 @@ pub fn command_history(
     }
     Ok(())
 }
+
+pub fn command_jobs() -> Result<(), std::io::Error> {
+    
+    Ok(())
+}

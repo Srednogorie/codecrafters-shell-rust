@@ -1,6 +1,6 @@
 use rustyline::history::FileHistory;
 
-use crate::commands::{command_cd, command_echo, command_exit, command_pwd, command_type, command_history};
+use crate::commands::{command_cd, command_echo, command_exit, command_history, command_jobs, command_pwd, command_type};
 use std::{fmt};
 use std::fs::File;
 use std::io::Write;
@@ -47,6 +47,7 @@ pub enum Commands {
     Pwd,
     Cd(String),
     History(HistoryArgs),
+    Jobs,
 }
 impl fmt::Display for Commands {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -57,6 +58,7 @@ impl fmt::Display for Commands {
             Commands::Pwd => "pwd",
             Commands::Cd(_) => "cd",
             Commands::History(_) => "history",
+            Commands::Jobs => "jobs",
         };
         write!(f, "{}", name)
     }
@@ -83,6 +85,7 @@ impl Commands {
                 },
                 None => Ok(Some(Commands::History(HistoryArgs::PrintAll))),
             },
+            "jobs" => Ok(Some(Commands::Jobs)),
             _ => Ok(None),
         }
     }
@@ -100,6 +103,7 @@ impl Commands {
             Commands::Exit => command_exit(history),
             Commands::Cd(path) => command_cd(path.to_string(), stderr_writer),
             Commands::History(args) => command_history(args, history, stdout_writer),
+            Commands::Jobs => command_jobs(),
         }
     }
 }
