@@ -8,17 +8,23 @@ use enums::{Commands, SpecialTokens};
 use rustyline::config::Config;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
-use rustyline::{CompletionType, Editor, Result, HistoryDuplicates};
+use rustyline::{CompletionType, Editor, Result};
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::process::Stdio;
 
 use crate::custom_rustyline::ShellCompleter;
-use crate::structs::{PipelineStage, Redirect};
+use crate::structs::{BackgroundJob, PipelineStage, Redirect};
 use crate::utils::execute_external;
 
 fn tokens_to_stage(tokens: Vec<String>) -> PipelineStage {
     let (command, command_args_raw) = tokens.split_first().unwrap();
+    let (run_in_background, command_args_raw) = match command_args_raw.split_last() {
+        Some((last, rest)) if last == "&" => (true, rest),
+        _ => (false, command_args_raw),
+    };
+    
     let mut special_token = None;
     let mut special_token_arg = None;
     let mut command_args = Vec::new();
@@ -62,11 +68,12 @@ fn tokens_to_stage(tokens: Vec<String>) -> PipelineStage {
     if let (Some(token), Some(target)) = (special_token, special_token_arg) {
         PipelineStage {
             command: command.to_string(),
+            run_in_background,
             args: command_args,
             redirect: Some(Redirect { token, target: target.to_string() }),
         }
     } else {
-        PipelineStage { command: command.to_string(), args: command_args, redirect: None }
+        PipelineStage { command: command.to_string(), run_in_background, args: command_args, redirect: None }
     }
 }
 
@@ -160,9 +167,12 @@ fn parse_input(input: &str) -> Vec<PipelineStage> {
     tokens_set
 }
 
-fn execute_pipeline(stages: Vec<PipelineStage>, history: &mut FileHistory) -> Result<()> {
+fn execute_pipeline(
+    stages: Vec<PipelineStage>, history: &mut FileHistory, background_jobs: &mut Vec<BackgroundJob>
+) -> Result<()> {
     let mut previous_stdout: Option<std::fs::File> = None;
-    let mut children = Vec::new();
+    // let mut children = Vec::new();
+    let mut children = HashMap::new();
     
 
     for (i, stage) in stages.iter().enumerate() {
@@ -214,7 +224,8 @@ fn execute_pipeline(stages: Vec<PipelineStage>, history: &mut FileHistory) -> Re
                             previous_stdout =
                                 child.stdout.take().map(|s| unsafe { std::fs::File::from_raw_fd(s.into_raw_fd()) });
                         }
-                        children.push(child);
+                        // children.push(child);
+                        children.insert(child.id(), (child, stage.run_in_background));
                     }
                     Err(e) => {
                         eprintln!("{}", e);
@@ -226,8 +237,13 @@ fn execute_pipeline(stages: Vec<PipelineStage>, history: &mut FileHistory) -> Re
             }
         }
     }
-    for mut child in children {
-        child.wait().unwrap();
+    for (ix, (id, (mut child, is_background))) in children.into_iter().enumerate() {
+        if is_background {
+            println!("[{}] {}", ix + 1, id);
+            background_jobs.push(BackgroundJob { child });
+        } else {
+            child.wait().unwrap();
+        }
     }
     Ok(())
 }
@@ -244,6 +260,7 @@ fn main() -> Result<()> {
         let _ = rl.clear_history();
         let _ = rl.load_history(&var);
     }
+    let mut background_jobs: Vec<BackgroundJob> = Vec::new();
     
     loop {
         let input = rl.readline("$ ");
@@ -255,7 +272,7 @@ fn main() -> Result<()> {
                 if stages.is_empty() {
                     continue;
                 }
-                if let Err(e) = execute_pipeline(stages, rl.history_mut()) {
+                if let Err(e) = execute_pipeline(stages, rl.history_mut(), &mut background_jobs) {
                     eprintln!("{}", e);
                 }
             },
