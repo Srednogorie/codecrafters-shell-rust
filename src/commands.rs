@@ -141,12 +141,17 @@ pub fn command_history(
 }
 
 pub fn command_jobs(background_jobs: &mut Vec<BackgroundJob>) -> Result<(), std::io::Error> {
+    let jobs_len = background_jobs.len();
     for (i, job) in background_jobs.iter_mut().enumerate() {
         let is_running = job.child.try_wait()?.is_none();
         if is_running {
-            println!("[{}]+  Running                 {} {} &", i + 1, job.command, job.args.join(" "));
-        } else {
-            println!("[{}]-  Done                    {} {} &", i + 1, job.command, job.args.join(" "));
+            if jobs_len == i + 1 {
+                println!("[{}]+  Running                 {} {} &", i + 1, job.command, job.args.join(" "));
+            } else if jobs_len - 1 == i + 1 {
+                println!("[{}]-  Running                 {} {} &", i + 1, job.command, job.args.join(" "));
+            } else {
+                println!("[{}]   Running                 {} {} &", i + 1, job.command, job.args.join(" "));
+            }
         }
     }
     Ok(())

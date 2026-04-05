@@ -235,9 +235,9 @@ fn execute_pipeline(
             }
         }
     }
-    for (ix, (id, (mut child, is_background, command, args))) in children.into_iter().enumerate() {
+    for (id, (mut child, is_background, command, args)) in children.into_iter() {
         if is_background {
-            println!("[{}] {}", ix + 1, id);
+            println!("[{}] {}", background_jobs.len() + 1, id);
             background_jobs.push(BackgroundJob { child, command: command.clone(), args: args.clone() });
         } else {
             child.wait().unwrap();
