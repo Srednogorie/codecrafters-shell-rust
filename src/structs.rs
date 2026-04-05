@@ -12,6 +12,9 @@ pub struct Redirect {
     pub target: String, // the file path, owned
 }
 
+#[derive(Debug)]
 pub struct BackgroundJob {
     pub child: std::process::Child,
+    pub command: String,
+    pub args: Vec<String>,
 }

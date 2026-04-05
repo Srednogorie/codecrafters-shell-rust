@@ -1,6 +1,7 @@
 use rustyline::history::FileHistory;
 
 use crate::commands::{command_cd, command_echo, command_exit, command_history, command_jobs, command_pwd, command_type};
+use crate::structs::BackgroundJob;
 use std::{fmt};
 use std::fs::File;
 use std::io::Write;
@@ -94,6 +95,7 @@ impl Commands {
         stdout_writer: &mut dyn Write,
         stderr_writer: &mut dyn Write,
         history: &mut FileHistory,
+        background_jobs: &mut Vec<BackgroundJob>,
     ) -> Result<(), std::io::Error> {
         match self {
             Commands::Echo(args) => command_echo(args, stdout_writer),
@@ -103,7 +105,7 @@ impl Commands {
             Commands::Exit => command_exit(history),
             Commands::Cd(path) => command_cd(path.to_string(), stderr_writer),
             Commands::History(args) => command_history(args, history, stdout_writer),
-            Commands::Jobs => command_jobs(),
+            Commands::Jobs => command_jobs(background_jobs),
         }
     }
 }

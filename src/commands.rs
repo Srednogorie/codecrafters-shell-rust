@@ -1,6 +1,7 @@
 use rustyline::history::{FileHistory, History};
 
 use crate::enums::{Commands, HistoryArgs, HistoryFlags};
+use crate::structs::BackgroundJob;
 use crate::utils::*;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -139,7 +140,14 @@ pub fn command_history(
     Ok(())
 }
 
-pub fn command_jobs() -> Result<(), std::io::Error> {
-    
+pub fn command_jobs(background_jobs: &mut Vec<BackgroundJob>) -> Result<(), std::io::Error> {
+    for (i, job) in background_jobs.iter_mut().enumerate() {
+        let is_running = job.child.try_wait()?.is_none();
+        if is_running {
+            println!("[{}]+  Running                 {} {} &", i + 1, job.command, job.args.join(" "));
+        } else {
+            println!("[{}]-  Done                    {} {} &", i + 1, job.command, job.args.join(" "));
+        }
+    }
     Ok(())
 }

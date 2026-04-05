@@ -171,7 +171,6 @@ fn execute_pipeline(
     stages: Vec<PipelineStage>, history: &mut FileHistory, background_jobs: &mut Vec<BackgroundJob>
 ) -> Result<()> {
     let mut previous_stdout: Option<std::fs::File> = None;
-    // let mut children = Vec::new();
     let mut children = HashMap::new();
     
 
@@ -187,7 +186,7 @@ fn execute_pipeline(
             Ok(Some(cmd)) => {
                 let mut stdout_cursor = std::io::Cursor::new(Vec::<u8>::new());
                 let mut stderr_cursor = std::io::Cursor::new(Vec::<u8>::new());
-                let _ = cmd.execute(&mut stdout_cursor, &mut stderr_cursor, history);
+                let _ = cmd.execute(&mut stdout_cursor, &mut stderr_cursor, history, background_jobs);
 
                 if i < stages.len() - 1 {
                     // not the last stage — feed output into a pipe
@@ -224,8 +223,7 @@ fn execute_pipeline(
                             previous_stdout =
                                 child.stdout.take().map(|s| unsafe { std::fs::File::from_raw_fd(s.into_raw_fd()) });
                         }
-                        // children.push(child);
-                        children.insert(child.id(), (child, stage.run_in_background));
+                        children.insert(child.id(), (child, stage.run_in_background, &stage.command, &stage.args));
                     }
                     Err(e) => {
                         eprintln!("{}", e);
@@ -237,10 +235,10 @@ fn execute_pipeline(
             }
         }
     }
-    for (ix, (id, (mut child, is_background))) in children.into_iter().enumerate() {
+    for (ix, (id, (mut child, is_background, command, args))) in children.into_iter().enumerate() {
         if is_background {
             println!("[{}] {}", ix + 1, id);
-            background_jobs.push(BackgroundJob { child });
+            background_jobs.push(BackgroundJob { child, command: command.clone(), args: args.clone() });
         } else {
             child.wait().unwrap();
         }
