@@ -147,17 +147,23 @@ pub fn command_jobs(background_jobs: &mut Vec<BackgroundJob>) -> Result<(), std:
         match job.child.try_wait() {
             Ok(None) => {
                 if jobs_len == i {
-                    println!("[{}]+  Running                 {} {} &", i, job.command, job.args.join(" "));
+                    println!("[{}]+  Running                 {} {} &", job.num, job.command, job.args.join(" "));
                 } else if jobs_len - 1 == i {
-                    println!("[{}]-  Running                 {} {} &", i, job.command, job.args.join(" "));
+                    println!("[{}]-  Running                 {} {} &", job.num, job.command, job.args.join(" "));
                 } else {
-                    println!("[{}]   Running                 {} {} &", i, job.command, job.args.join(" "));
+                    println!("[{}]   Running                 {} {} &", job.num, job.command, job.args.join(" "));
                 }
                 i += 1;
                 true
             }
             Ok(Some(_)) => {
-                println!("[{}]+   Done                   {} {}", i, job.command, job.args.join(" "));
+                if jobs_len == i {
+                    println!("[{}]+  Done                 {} {}", job.num, job.command, job.args.join(" "));
+                } else if jobs_len - 1 == i {
+                    println!("[{}]-  Done                 {} {}", job.num, job.command, job.args.join(" "));
+                } else {
+                    println!("[{}]   Done                 {} {}", job.num, job.command, job.args.join(" "));
+                }
                 i += 1;
                 false
             }

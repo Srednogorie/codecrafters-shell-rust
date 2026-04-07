@@ -17,4 +17,5 @@ pub struct BackgroundJob {
     pub child: std::process::Child,
     pub command: String,
     pub args: Vec<String>,
+    pub num: usize,
 }
