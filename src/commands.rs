@@ -140,29 +140,37 @@ pub fn command_history(
     Ok(())
 }
 
-pub fn command_jobs(background_jobs: &mut Vec<BackgroundJob>) -> Result<(), std::io::Error> {
+pub fn command_jobs_print(background_jobs: &mut Vec<BackgroundJob>, is_command_jobs: bool) {
     let jobs_len = background_jobs.len();
     let mut i = 1;
     background_jobs.retain_mut(|job| {
         match job.child.try_wait() {
             Ok(None) => {
-                if jobs_len == i {
-                    println!("[{}]+  Running                 {} {} &", job.num, job.command, job.args.join(" "));
-                } else if jobs_len - 1 == i {
-                    println!("[{}]-  Running                 {} {} &", job.num, job.command, job.args.join(" "));
-                } else {
-                    println!("[{}]   Running                 {} {} &", job.num, job.command, job.args.join(" "));
+                if is_command_jobs {
+                    if jobs_len == i {
+                        println!(
+                            "[{}]+  Running                 {} {} &", job.order_num, job.command, job.args.join(" ")
+                        );
+                    } else if jobs_len - 1 == i {
+                        println!(
+                            "[{}]-  Running                 {} {} &", job.order_num, job.command, job.args.join(" ")
+                        );
+                    } else {
+                        println!(
+                            "[{}]   Running                 {} {} &", job.order_num, job.command, job.args.join(" ")
+                        );
+                    }
                 }
                 i += 1;
                 true
             }
             Ok(Some(_)) => {
                 if jobs_len == i {
-                    println!("[{}]+  Done                 {} {}", job.num, job.command, job.args.join(" "));
+                    println!("[{}]+  Done                 {} {}", job.order_num, job.command, job.args.join(" "));
                 } else if jobs_len - 1 == i {
-                    println!("[{}]-  Done                 {} {}", job.num, job.command, job.args.join(" "));
+                    println!("[{}]-  Done                 {} {}", job.order_num, job.command, job.args.join(" "));
                 } else {
-                    println!("[{}]   Done                 {} {}", job.num, job.command, job.args.join(" "));
+                    println!("[{}]   Done                 {} {}", job.order_num, job.command, job.args.join(" "));
                 }
                 i += 1;
                 false
@@ -172,5 +180,9 @@ pub fn command_jobs(background_jobs: &mut Vec<BackgroundJob>) -> Result<(), std:
             }
         }
     });
+}
+
+pub fn command_jobs(background_jobs: &mut Vec<BackgroundJob>) -> Result<(), std::io::Error> {
+    command_jobs_print(background_jobs, true);
     Ok(())
 }

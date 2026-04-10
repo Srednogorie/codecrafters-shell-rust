@@ -2,7 +2,6 @@ use crate::enums::SpecialTokens;
 
 pub struct PipelineStage {
     pub command: String,
-    pub run_in_background: bool,
     pub args: Vec<String>,
     pub redirect: Option<Redirect>, // stdout/stderr redirect for this stage
 }
@@ -17,5 +16,5 @@ pub struct BackgroundJob {
     pub child: std::process::Child,
     pub command: String,
     pub args: Vec<String>,
-    pub num: usize,
+    pub order_num: usize,
 }

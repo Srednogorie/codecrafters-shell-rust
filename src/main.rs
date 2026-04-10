@@ -9,21 +9,17 @@ use rustyline::config::Config;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
 use rustyline::{CompletionType, Editor, Result};
-use std::collections::HashMap;
 use std::io::{self, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
-use std::process::Stdio;
+use std::process::{Child, Stdio};
 
+use crate::commands::command_jobs_print;
 use crate::custom_rustyline::ShellCompleter;
 use crate::structs::{BackgroundJob, PipelineStage, Redirect};
 use crate::utils::execute_external;
 
 fn tokens_to_stage(tokens: Vec<String>) -> PipelineStage {
     let (command, command_args_raw) = tokens.split_first().unwrap();
-    let (run_in_background, command_args_raw) = match command_args_raw.split_last() {
-        Some((last, rest)) if last == "&" => (true, rest),
-        _ => (false, command_args_raw),
-    };
     
     let mut special_token = None;
     let mut special_token_arg = None;
@@ -68,16 +64,20 @@ fn tokens_to_stage(tokens: Vec<String>) -> PipelineStage {
     if let (Some(token), Some(target)) = (special_token, special_token_arg) {
         PipelineStage {
             command: command.to_string(),
-            run_in_background,
             args: command_args,
             redirect: Some(Redirect { token, target: target.to_string() }),
         }
     } else {
-        PipelineStage { command: command.to_string(), run_in_background, args: command_args, redirect: None }
+        PipelineStage { command: command.to_string(), args: command_args, redirect: None }
     }
 }
 
-fn parse_input(input: &str) -> Vec<PipelineStage> {
+fn parse_input(input: &str) -> (Vec<PipelineStage>, bool) {
+    let (run_in_background, input) = if input.ends_with("&") {
+        (true, input.trim_end_matches("&"))
+    } else {
+        (false, input)
+    };
     let input = input.replace("''", "");
     let input = input.replace("\"\"", "");
     // read_line` includes the **newline character** `'\n'` at the end of the input
@@ -164,14 +164,17 @@ fn parse_input(input: &str) -> Vec<PipelineStage> {
         tokens.push(std::mem::take(&mut token));
         tokens_set.push(tokens_to_stage(tokens.clone()));
     }
-    tokens_set
+    (tokens_set, run_in_background)
 }
 
 fn execute_pipeline(
-    stages: Vec<PipelineStage>, history: &mut FileHistory, background_jobs: &mut Vec<BackgroundJob>
+    stages: Vec<PipelineStage>,
+    history: &mut FileHistory,
+    background_jobs: &mut Vec<BackgroundJob>,
+    is_background: bool,
 ) -> Result<()> {
     let mut previous_stdout: Option<std::fs::File> = None;
-    let mut children = HashMap::new();
+    let mut children: Vec<(Child, &String, &Vec<String>)> = Vec::new();
     
 
     for (i, stage) in stages.iter().enumerate() {
@@ -223,7 +226,7 @@ fn execute_pipeline(
                             previous_stdout =
                                 child.stdout.take().map(|s| unsafe { std::fs::File::from_raw_fd(s.into_raw_fd()) });
                         }
-                        children.insert(child.id(), (child, stage.run_in_background, &stage.command, &stage.args));
+                        children.push((child, &stage.command, &stage.args));
                     }
                     Err(e) => {
                         eprintln!("{}", e);
@@ -235,11 +238,12 @@ fn execute_pipeline(
             }
         }
     }
-    for (id, (mut child, is_background, command, args)) in children.into_iter() {
+    for (mut child, command, args) in children.into_iter() {
         if is_background {
-            println!("[{}] {}", background_jobs.len() + 1, id);
+            let order_num = background_jobs.len() + 1;
+            println!("[{}] {}", order_num, child.id());
             background_jobs.push(
-                BackgroundJob { child, command: command.clone(), args: args.clone(), num: background_jobs.len() + 1 }
+                BackgroundJob { child, command: command.clone(), args: args.clone(), order_num }
             );
         } else {
             child.wait().unwrap();
@@ -263,47 +267,17 @@ fn main() -> Result<()> {
     let mut background_jobs: Vec<BackgroundJob> = Vec::new();
     
     loop {
-        let jobs_len = background_jobs.len();
-        let mut i = 1;
-        background_jobs.retain_mut(|job| {
-            match job.child.try_wait() {
-                Ok(None) => {
-                    // if jobs_len == i {
-                    //     println!("[{}]+  Running                 {} {} &", job.num, job.command, job.args.join(" "));
-                    // } else if jobs_len - 1 == i {
-                    //     println!("[{}]-  Running                 {} {} &", job.num, job.command, job.args.join(" "));
-                    // } else {
-                    //     println!("[{}]   Running                 {} {} &", job.num, job.command, job.args.join(" "));
-                    // }
-                    i += 1;
-                    true
-                }
-                Ok(Some(_)) => {
-                    if jobs_len == i {
-                        println!("[{}]+  Done                 {} {}", job.num, job.command, job.args.join(" "));
-                    } else if jobs_len - 1 == i {
-                        println!("[{}]-  Done                 {} {}", job.num, job.command, job.args.join(" "));
-                    } else {
-                        println!("[{}]   Done                 {} {}", job.num, job.command, job.args.join(" "));
-                    }
-                    i += 1;
-                    false
-                }
-                Err(_) => {
-                    false
-                }
-            }
-        });
+        command_jobs_print(&mut background_jobs, false);
         let input = rl.readline("$ ");
 
         match input {
             Ok(line) => {
                 rl.add_history_entry(line.as_str())?;
-                let stages = parse_input(&line);
+                let (stages, run_in_background) = parse_input(&line);
                 if stages.is_empty() {
                     continue;
                 }
-                if let Err(e) = execute_pipeline(stages, rl.history_mut(), &mut background_jobs) {
+                if let Err(e) = execute_pipeline(stages, rl.history_mut(), &mut background_jobs, run_in_background) {
                     eprintln!("{}", e);
                 }
             },
